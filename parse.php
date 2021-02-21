@@ -361,6 +361,7 @@ class Inst
 
             switch ($this->opcode) {
                 case 'CALL':
+                case 'RETURN':
                 case 'JUMP':
                 case 'JUMPIFEQ':
                 case 'JUMPIFNEQ':
