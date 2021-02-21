@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""IPPcode21 language interpreter in Python
+    Author: Petr Kabelka <xkabel09 at stud.fit.vutbr.cz>
+"""
 
 import sys
 import argparse
@@ -36,7 +41,7 @@ def exit_err(code, message=''):
     print(message, file=sys.stderr)
     exit(code.value)
 
-class Inst():
+class Instruction():
     _INST_MAP = {
         'MOVE': ('var', 'symb'),
         'CREATEFRAME': tuple(),
@@ -76,8 +81,14 @@ class Inst():
     }
 
     @classmethod
+    def opcode_exists(cls, opcode):
+        if opcode in cls._INST_MAP:
+            return True
+        return False
+
+    @classmethod
     def opcode_args(cls, opcode):
-        if not opcode in cls._INST_MAP:
+        if not cls.opcode_exists(opcode):
             return None
         return cls._INST_MAP[opcode]
 
@@ -85,7 +96,7 @@ class Inst():
         self.opcode = opcode
         self.args = args
         # self.argc = len(self.args)
-        
+
 
 class Instructions:
     def __init__(self):
@@ -95,13 +106,124 @@ class Instructions:
         self.labels = {}
         self.executed_count = 0
 
-    def add(self, inst: Inst):
+    def add(self, inst: Instruction):
+        """Appends the instruction to the instruction list
+
+        It also adds new labels into the labels dict
+
+        Parameters:
+            inst: Inst object to add to the list
+        """
         self.instructions.append(inst)
         if inst.opcode == 'LABEL':
             if inst.args[0]['value'] in self.labels:
-                exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" was already defined'.format(inst.args[0]['value']))
+                exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" is already defined'.format(inst.args[0]['value']))
             # could be just len(self.instructions), because if you can jump, then there is definitely another instruction after label
             self.labels[inst.args[0]['value']] = len(self.instructions) - 1
+
+    def next(self):
+        if self.pc < len(self.instructions):
+            self.pc += 1
+            self.executed_count += 1
+            return self.instructions[self.pc - 1]
+        return None
+
+    def jump(self, label):
+        if label not in self.labels:
+            exit_err(Code.UNDEF_REDEF, f'Error: Label "{label}" is not defined')
+        self.pc = self.labels[label]
+
+
+class InstructionExecutor:
+    def __init__(self, instructions):
+        self.insts = instructions
+
+    def interpret(self):
+        while True:
+            inst = self.insts.next()
+            if inst is None:
+                break
+
+            if Instruction.opcode_exists(inst.opcode):
+                # print(self.insts.pc)
+                eval(f'self._{inst.opcode}(inst.args)')
+
+    def _MOVE(self, args):
+        pass
+    def _CREATEFRAME(self, args):
+        pass
+    def _PUSHFRAME(self, args):
+        pass
+    def _POPFRAME(self, args):
+        pass
+    def _DEFVAR(self, args):
+        pass
+    def _CALL(self, args):
+        pass
+    def _RETURN(self, args):
+        pass
+    def _PUSHS(self, args):
+        pass
+    def _POPS(self, args):
+        pass
+    def _ADD(self, args):
+        pass
+    def _SUB(self, args):
+        pass
+    def _MUL(self, args):
+        pass
+    def _IDIV(self, args):
+        pass
+    def _LT(self, args):
+        pass
+    def _GT(self, args):
+        pass
+    def _EQ(self, args):
+        pass
+    def _AND(self, args):
+        pass
+    def _OR(self, args):
+        pass
+    def _NOT(self, args):
+        pass
+    def _INT2CHAR(self, args):
+        pass
+    def _STRI2INT(self, args):
+        pass
+    def _READ(self, args):
+        pass
+    def _WRITE(self, args):
+        pass
+    def _CONCAT(self, args):
+        pass
+    def _STRLEN(self, args):
+        pass
+    def _GETCHAR(self, args):
+        pass
+    def _SETCHAR(self, args):
+        pass
+    def _TYPE(self, args):
+        pass
+    def _LABEL(self, args):
+        pass
+    def _JUMP(self, args):
+        self.insts.jump(args[0]['value'])
+    def _JUMPIFEQ(self, args):
+        pass
+    def _JUMPIFNEQ(self, args):
+        pass
+    def _EXIT(self, args):
+        pass
+    def _DPRINT(self, args):
+        pass
+    def _BREAK(self, args): # TODO
+        print(f'Number of executed instructions: {self.insts.executed_count}\n', file=sys.stderr)
+        print(f'Global Frame: \n', file=sys.stderr)
+        print(f'Local Frame: \n', file=sys.stderr)
+        print(f'Temporary Frame: \n', file=sys.stderr)
+        print(f'Stack: ', file=sys.stderr)
+
+
 
 class XMLParser():
     """Contains parse function to parse XML document into Instructions class"""
@@ -112,11 +234,12 @@ class XMLParser():
     def parse(self, source_path):
         """Parses the XML document, checks the structure and lexical and syntactical correctness
 
+        Parameters:
+            source_path: filename or file object containing XML data
+
         Returns:
             Instructions: Class containing the parsed instructions
         """
-        if source_path == None:
-            source_path = sys.stdin
 
         try:
             tree = ET.parse(source_path)
@@ -164,7 +287,7 @@ class XMLParser():
 
             # check instruction syntax
             args = self._inst_syntax(inst)
-            self.instructions.add(Inst(opcode, args))
+            self.instructions.add(Instruction(opcode, args))
 
         return self.instructions
 
@@ -174,11 +297,11 @@ class XMLParser():
         # args = {}
         opcode = inst.attrib['opcode'].upper()
         order = inst.attrib['order']
-        if Inst.opcode_args(opcode) is None:
+        if Instruction.opcode_args(opcode) is None:
             exit_err(Code.BAD_STRUCT, 'Error: Unknown instruction opcode "{}" with order "{}"'.format(inst.attrib['opcode'], order))
 
-        if len(inst) != len(Inst.opcode_args(opcode)):
-            exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Wrong number of arguments, expected {} but {} given'.format(order, len(Inst.opcode_args(opcode)), len(inst)))
+        if len(inst) != len(Instruction.opcode_args(opcode)):
+            exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Wrong number of arguments, expected {} but {} given'.format(order, len(Instruction.opcode_args(opcode)), len(inst)))
 
         # argument syntax
         arg_i = 1
@@ -189,7 +312,7 @@ class XMLParser():
             if len(arg.attrib) > 1 or 'type' not in arg.attrib:
                 exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": Expected a single argument attribute "type"')
 
-            pos_type = Inst.opcode_args(opcode)[arg_i-1]
+            pos_type = Instruction.opcode_args(opcode)[arg_i-1]
             if pos_type == 'symb':
                 if arg.attrib['type'] not in ['int', 'string', 'bool', 'nil', 'var']:
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Unexpected symb argument type "{}"'.format(order, arg.attrib['type']))
@@ -255,26 +378,31 @@ class XMLParser():
         return chr(int(match.group(1)))
 
 
-
-
 def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-h', '--help', action='store_true', help='show this help message and exit', default=False)
-    parser.add_argument('-s', '--source', metavar='SOURCE_FILE', action='store', help='XML source code', default=None)
+    parser.add_argument('-s', '--source', metavar='SOURCE_FILE', action='store', help='XML source code', default=sys.stdin)
     parser.add_argument('-i', '--input', metavar='INPUT_FILE', action='store', help='Input to feed into STDIN', default=None)
     args = parser.parse_args()
 
     if args.help == True and args.source == None and args.input == None:
         parser.print_help()
         exit(0)
-    elif (args.help == True and (args.source != None or args.input != None)) or (args.source == None and args.input == None):
+    elif (args.help == True and (args.source != sys.stdin or args.input != None)) or (args.source == sys.stdin and args.input == None):
         exit_err(Code.BAD_PARAM)
 
     # print(args.source)
     xmlparser = XMLParser()
     instructions = xmlparser.parse(args.source)
-    for inst in instructions.instructions:
-        print(inst.args)
+
+    InstructionExecutor(instructions).interpret()
+
+
+
+
+
+    # for inst in instructions.instructions:
+    #     print(inst.args)
 
 
 if __name__ == '__main__':
