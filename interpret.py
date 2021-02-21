@@ -14,19 +14,26 @@ class Code(Enum):
     WRITE_ERR = 12
     BAD_XML = 31
     BAD_STRUCT = 32
-    INTERNAL_ERR = 99
+    UNDEF_REDEF = 52
+    BAD_OPERAND_TYPE = 53
+    UNDEF_VAR = 54
+    UNDEF_FRAME = 55
+    MISSING_VAL = 56
+    BAD_OPERAND_VAL = 57
+    STRING_ERR = 58
 
-def exit_err(code, message=None):
+def exit_err(code, message=''):
     err_messages = {
         Code.BAD_PARAM: 'Error: Wrong combination of parameters\nRun only with --help to show help',
         Code.OPEN_ERR: 'Error: Cannot open file',
         Code.BAD_XML: 'Error: Wrong XML format. XML is not well-formed',
         Code.BAD_STRUCT: 'Error: Wrong XML structure'
     }
-    if message != None:
-        print(message, file=sys.stderr)
-    else:
-        print(err_messages[code], file=sys.stderr)
+    if message == '':
+        if code in err_messages:
+            message = err_messages[code]
+    
+    print(message, file=sys.stderr)
     exit(code.value)
 
 class Inst():
@@ -85,16 +92,29 @@ class Instructions:
         self.instructions = []
         self.pc = 0
         self.calls = []
+        self.labels = {}
+        self.executed_count = 0
 
     def add(self, inst: Inst):
         self.instructions.append(inst)
+        if inst.opcode == 'LABEL':
+            if inst.args[0]['value'] in self.labels:
+                exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" was already defined'.format(inst.args[0]['value']))
+            # could be just len(self.instructions), because if you can jump, then there is definitely another instruction after label
+            self.labels[inst.args[0]['value']] = len(self.instructions) - 1
 
 class XMLParser():
+    """Contains parse function to parse XML document into Instructions class"""
     def __init__(self):
         self.instructions = Instructions()
 
 
     def parse(self, source_path):
+        """Parses the XML document, checks the structure and lexical and syntactical correctness
+
+        Returns:
+            Instructions: Class containing the parsed instructions
+        """
         if source_path == None:
             source_path = sys.stdin
 
@@ -109,7 +129,7 @@ class XMLParser():
 
         root = tree.getroot()
 
-        # XML structure
+        # check XML structure
         if root.tag != 'program':
             exit_err(Code.BAD_STRUCT, 'Error: "program" root element not found')
 
@@ -142,6 +162,7 @@ class XMLParser():
                 exit_err(Code.BAD_STRUCT, f'Error: Duplicate instruction order found: {order}')
             inst_orders[order] = None
 
+            # check instruction syntax
             args = self._inst_syntax(inst)
             self.instructions.add(Inst(opcode, args))
 
@@ -153,16 +174,16 @@ class XMLParser():
         # args = {}
         opcode = inst.attrib['opcode'].upper()
         order = inst.attrib['order']
-        if Inst.opcode_args(opcode) is None: # unknown instruction opcode
+        if Inst.opcode_args(opcode) is None:
             exit_err(Code.BAD_STRUCT, 'Error: Unknown instruction opcode "{}" with order "{}"'.format(inst.attrib['opcode'], order))
 
-        if len(inst) != len(Inst.opcode_args(opcode)): # wrong number of arguments
+        if len(inst) != len(Inst.opcode_args(opcode)):
             exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Wrong number of arguments, expected {} but {} given'.format(order, len(Inst.opcode_args(opcode)), len(inst)))
 
         # argument syntax
         arg_i = 1
         for arg in inst:
-            if arg.tag != f'arg{arg_i}': # wrong argument order
+            if arg.tag != f'arg{arg_i}':
                 exit_err(Code.BAD_STRUCT, f'Error: expected "arg{arg_i}" tag, not "{arg.tag}"')
 
             if len(arg.attrib) > 1 or 'type' not in arg.attrib:
@@ -181,6 +202,10 @@ class XMLParser():
                     if arg.text is not None:
                         if re.match(r'^(?:[^\s\#\\]|\\[0-9]{3})*$', arg.text) is None:
                             exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
+
+                        arg.text = re.sub(r'\\([0-9]{3})', self._escape_ascii, arg.text) # replace escape sequences with their characters
+                    else:
+                        arg.text = ''
 
                 elif arg.attrib['type'] == 'bool':
                     if arg.text is None or (arg.text != 'true' and arg.text != 'false'):
@@ -226,15 +251,9 @@ class XMLParser():
         if arg.text is None or re.match(r'^(?:LF|TF|GF)@[a-zA-Z_\-\$\&\%\*\!\?][a-zA-Z0-9_\-\$\&\%\*\!\?]*$', arg.text) is None:
             exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
 
+    def _escape_ascii(self, match):
+        return chr(int(match.group(1)))
 
-
-
-
-
-
-
-
-        
 
 
 
@@ -255,7 +274,7 @@ def main():
     xmlparser = XMLParser()
     instructions = xmlparser.parse(args.source)
     for inst in instructions.instructions:
-        print(inst)
+        print(inst.args)
 
 
 if __name__ == '__main__':
