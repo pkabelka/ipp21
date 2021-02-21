@@ -240,6 +240,13 @@ class Inst
                     exit_err(Code::BAD_HEADER, ".IPPcode21 header not found\n");
                 }
             }
+            else
+            {
+                if (strtoupper($line) === '.IPPCODE21')
+                {
+                    exit_err(Code::PARSE_ERR, ".IPPcode21 header found multiple times\n");
+                }
+            }
 
             $res = $this->syntax(explode(' ', $line));
             switch ($res) {
