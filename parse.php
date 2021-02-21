@@ -367,8 +367,10 @@ class Inst
             Stats::inc('loc');
 
             switch ($this->opcode) {
-                case 'CALL':
                 case 'RETURN':
+                    Stats::inc('jumps');
+                    break;
+                case 'CALL':
                 case 'JUMP':
                 case 'JUMPIFEQ':
                 case 'JUMPIFNEQ':
