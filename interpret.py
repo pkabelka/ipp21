@@ -205,7 +205,7 @@ class Frames():
         frame_name, var_name = id.split('@', 1)
         if frame_name == 'LF':
             if len(self._lf_stack) == 0:
-                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "LF@{name} because frames on the frame stack')
+                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "LF@{var_name}, no frames on the frame stack')
             frame = self._lf_stack[-1]
 
         elif frame_name == 'TF':
@@ -219,33 +219,11 @@ class Frames():
         if var_name not in frame:
             exit_err(Code.UNDEF_VAR, f'Error: "{frame_name}@{var_name}" is not defined')
 
-        return frame[var_name]
+        return frame, var_name
 
     def setvar(self, id, var: Var):
-        frame, name = id.split('@', 1)
-        if frame == 'LF':
-            if len(self._lf_stack) == 0:
-                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "LF@{name} because frames on the frame stack')
-
-            if name not in self._lf_stack[-1]:
-                exit_err(Code.UNDEF_VAR, f'Error: "LF@{name}" is not defined')
-
-            self._lf_stack[-1][name] = var
-
-        elif frame == 'TF':
-            if not self._tf_created:
-                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "TF@{name}" because TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
-
-            if name not in self._tf:
-                exit_err(Code.UNDEF_VAR, f'Error: "TF@{name}" is not defined')
-
-            self._tf[name] = var
-
-        elif frame == 'GF':
-            if name not in self._gf:
-                exit_err(Code.UNDEF_VAR, f'Error: "GF@{name}" is not defined')
-
-            self._gf[name] = var
+        frame, var_name = self.getvar(id)
+        frame[var_name] = var
 
     def get_gf(self):
         return self._gf
@@ -295,8 +273,8 @@ class InstructionExecutor:
         if args[1]['type'] in ['int', 'string', 'bool', 'nil']:
             self.frames.setvar(args[0]['value'], Var(args[1]['type'], args[1]['value']))
         elif args[1]['type'] == 'var':
-            var = self.frames.getvar(args[0]['value'])
-            self.frames.setvar(args[0]['value'], var)
+            frame, var_name = self.frames.getvar(args[1]['value'])
+            self.frames.setvar(args[0]['value'], frame[var_name])
     def _CREATEFRAME(self, args):
         self.frames.createframe()
     def _PUSHFRAME(self, args):
@@ -313,8 +291,8 @@ class InstructionExecutor:
         if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
             self.stack.pushs(Var(args[0]['type'], args[0]['value']))
         elif args[0]['type'] == 'var':
-            var = self.frames.getvar(args[0]['value'])
-            self.stack.pushs(var)
+            frame, var_name = self.frames.getvar(args[0]['value'])
+            self.stack.pushs(frame[var_name])
     def _POPS(self, args):
         self.frames.setvar(args[0]['value'], self.stack.pops())
     def _ADD(self, args):
@@ -389,7 +367,7 @@ class InstructionExecutor:
             print(f'TF@{id}={str(tf[id])}', file=sys.stderr)
 
         print('\nStack:', file=sys.stderr)
-        for var in stack:
+        for var in reversed(stack):
             print(f'Stack@={str(var)}', file=sys.stderr)
 
 
