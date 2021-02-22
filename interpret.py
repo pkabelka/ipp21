@@ -117,8 +117,8 @@ class Instructions:
         if inst.opcode == 'LABEL':
             if inst.args[0]['value'] in self._labels:
                 exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" is already defined'.format(inst.args[0]['value']))
-            # could be just len(self.instructions), because if you can jump, then there is definitely another instruction after label
-            self._labels[inst.args[0]['value']] = len(self._instructions) - 1
+
+            self._labels[inst.args[0]['value']] = len(self._instructions)
 
     def next(self):
         if self._pc < len(self._instructions):
@@ -135,16 +135,150 @@ class Instructions:
     def get_pc(self):
         return self._pc
 
+    def call(self):
+        self._calls.append(self.get_pc())
+
+    def return_(self):
+        if len(self._calls) == 0:
+            exit_err(Code.MISSING_VAL, f'Error: Cannot "RETURN", no address on the call stack')
+        self._pc = self._calls.pop()
+
+    def dec_executed(self):
+        self.executed_count -= 1
+
 
 
 class Var:
     """Class representing a variable, has type and value"""
     def __init__(self, type_, value):
         self.type = type_
-        self.value = value
+        if self.type == 'int':
+            try:
+                self.value = int(value)
+            except ValueError:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+        else:
+            self.value = value
 
     def __repr__(self):
+        if self.value == None:
+            return ''
         return f'{str(self.value)}({self.type})'
+
+    def __add__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var(self.type, int(self.value) + int(second.value))
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            elif self.type == 'string':
+                return Var(self.type, str(self.value) + str(second.value))
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not of same type')
+
+    def __sub__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var(self.type, int(self.value) - int(second.value))
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, both not of same type')
+
+    def __mul__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var(self.type, int(self.value) * int(second.value))
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, both not of same type')
+
+    def __floordiv__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    val1 = int(self.value)
+                    val2 = int(second.value)
+                    if val2 == 0:
+                        exit_err(Code.BAD_OPERAND_VAL, 'Error: Division by zero')
+                    return Var(self.type, val1 // val2)
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not of same type')
+
+    def __lt__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var('bool', 'true' if int(self.value) < int(second.value) else 'false')
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            elif self.type == 'bool':
+                return Var('bool', 'true' if self.value == 'false' else 'false')
+            elif self.type == 'string':
+                return Var('bool', 'true' if self.value < second.value else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __gt__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var('bool', str(int(self.value) > int(second.value)).lower())
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            elif self.type == 'bool':
+                return Var('bool', 'true' if second.value == 'false' else 'false')
+            elif self.type == 'string':
+                return Var('bool', 'true' if self.value > second.value else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __eq__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var('bool', str(int(self.value) == int(second.value)).lower())
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            elif self.type in ['int', 'string', 'bool', 'nil']:
+                return Var('bool', 'true' if self.value == second.value else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __and__(self, second):
+        if self.type == second.type:
+            if self.type == 'bool':
+                return Var('bool', 'true' if self.value == 'true' and second.value == 'true' else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __or__(self, second):
+        if self.type == second.type:
+            if self.type == 'bool':
+                return Var('bool', 'true' if self.value == 'true' or second.value == 'true' else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __invert__(self):
+        if self.type == 'bool':
+            return Var('bool', 'true' if self.value == 'false' else 'false')
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot negate the values, wrong operand type')
 
 
 class Frames():
@@ -164,6 +298,7 @@ class Frames():
             exit_err(Code.UNDEF_FRAME, 'Error: TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
 
         self._lf_stack.append(self._tf)
+        self._tf = {}
         self._tf_created = False
 
     def popframe(self):
@@ -236,6 +371,12 @@ class Frames():
     def get_tf(self):
         return self._tf
 
+    def const_var(self, var):
+        if var['type'] in ['int', 'string', 'bool', 'nil']:
+            return Var(var['type'], var['value'])
+        elif var['type'] == 'var':
+            frame, var_name = self.getvar(var['value'])
+            return frame[var_name]
 
 class Stack:
     def __init__(self):
@@ -275,77 +416,230 @@ class InstructionExecutor:
         elif args[1]['type'] == 'var':
             frame, var_name = self.frames.getvar(args[1]['value'])
             self.frames.setvar(args[0]['value'], frame[var_name])
+
     def _CREATEFRAME(self, args):
         self.frames.createframe()
+
     def _PUSHFRAME(self, args):
         self.frames.pushframe()
+
     def _POPFRAME(self, args):
         self.frames.popframe()
+
     def _DEFVAR(self, args):
         self.frames.defvar(args[0]['value'])
+
     def _CALL(self, args):
-        pass
+        self.insts.call()
+        self.insts.jump(args[0]['value'])
+
     def _RETURN(self, args):
-        pass
+        self.insts.return_()
+
     def _PUSHS(self, args):
         if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
             self.stack.pushs(Var(args[0]['type'], args[0]['value']))
         elif args[0]['type'] == 'var':
             frame, var_name = self.frames.getvar(args[0]['value'])
             self.stack.pushs(frame[var_name])
+
     def _POPS(self, args):
         self.frames.setvar(args[0]['value'], self.stack.pops())
+
     def _ADD(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.frames.setvar(args[0]['value'], symb1 + symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
+
     def _SUB(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.frames.setvar(args[0]['value'], symb1 - symb2)
+        elif symb1.type == 'string' or symb2.type == 'string':
+            exit_err(Code.STRING_ERR, 'Error: Cannot subtract strings')
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, both not type int')
+
     def _MUL(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.frames.setvar(args[0]['value'], symb1 * symb2)
+        elif symb1.type == 'string' or symb2.type == 'string':
+            exit_err(Code.STRING_ERR, 'Error: Cannot multiply strings')
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, both not type int')
+
     def _IDIV(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.frames.setvar(args[0]['value'], symb1 // symb2)
+        elif symb1.type == 'string' or symb2.type == 'string':
+            exit_err(Code.STRING_ERR, 'Error: Cannot floor divide strings')
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not type int')
+
     def _LT(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+            self.frames.setvar(args[0]['value'], symb1 < symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _GT(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+            self.frames.setvar(args[0]['value'], symb1 > symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _EQ(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            self.frames.setvar(args[0]['value'], symb1 == symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _AND(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'bool' and symb2.type == 'bool':
+            self.frames.setvar(args[0]['value'], symb1 and symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _OR(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'bool' and symb2.type == 'bool':
+            self.frames.setvar(args[0]['value'], symb1 or symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _NOT(self, args):
-        pass
+        symb = self.frames.const_var(args[1])
+        if symb.type == 'bool':
+            self.frames.setvar(args[0]['value'], ~symb)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot negate value')
+
     def _INT2CHAR(self, args):
-        pass
+        symb = self.frames.const_var(args[1])
+        if symb.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to char')
+        try:
+            self.frames.setvar(args[0]['value'], Var('string', chr(symb.value)))
+        except ValueError:
+            exit_err(Code.BAD_OPERAND_VAL, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
+
     def _STRI2INT(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type != 'string' or symb2.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
+        
+        if symb2.value < 0 or symb2.value >= len(symb1.value):
+            exit_err(Code.STRING_ERR, f'Error: Index out of range')
+
+        self.frames.setvar(args[0]['value'], Var('int', ord(symb1.value[symb2.value])))
+
     def _READ(self, args):
-        pass
+        if args[1]['value'] not in ['int', 'string', 'bool']:
+            exit_err(Code.BAD_OPERAND_VAL, f'Error: Wrong operand value')
+
+        type_ = args[1]['value']
+
+        res_val = ''
+        res_type = type_
+        try:
+            input_val = input()
+        except Exception:
+            res_val = 'nil'
+            res_type = 'nil'
+
+        if type_ == 'bool':
+            if input_val.upper() == 'TRUE':
+                res_val = 'true'
+            else:
+                res_val = 'false'
+        elif type_ == 'int':
+            try:
+                res_val = int(input_val)
+            except Exception:
+                res_val = 'nil'
+                res_type = 'nil'
+        elif type_ == 'string':
+            res_val = input_val
+        
+        self.frames.setvar(args[0]['value'], Var(res_type, res_val))
+
     def _WRITE(self, args):
-        pass
+        symb = self.frames.const_var(args[0])
+        if symb.type == 'nil':
+            print('', end='')
+        else:
+            print(symb.value, end='')
+
     def _CONCAT(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'string' and symb2.type == 'string':
+            self.frames.setvar(args[0]['value'], symb1 + symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot concatenate the values, both not type string')
+
     def _STRLEN(self, args):
         pass
+
     def _GETCHAR(self, args):
         pass
+
     def _SETCHAR(self, args):
         pass
+
     def _TYPE(self, args):
         pass
+
     def _LABEL(self, args):
-        pass
+        self.insts.dec_executed()
+
     def _JUMP(self, args):
         self.insts.jump(args[0]['value'])
+
     def _JUMPIFEQ(self, args):
         pass
+
     def _JUMPIFNEQ(self, args):
         pass
+
     def _EXIT(self, args):
-        pass
+        symb = self.frames.const_var(args[0])
+        if symb.type == 'int' and (symb.value >= 0 or symb.value <= 49):
+            exit(symb.value)
+        else:
+            exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
+
     def _DPRINT(self, args):
-        pass
-    def _BREAK(self, args): # TODO
+        if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
+            print('Const@={}({})'.format(args[0]['value'], args[0]['type']), file=sys.stderr)
+
+        elif args[0]['type'] == 'var':
+            frame, var_name = self.frames.getvar(args[0]['value'])
+
+            if frame[var_name].value == None:
+                print('{}()'.format(args[0]['value']), file=sys.stderr)
+            else:
+                print('{}={}({})'.format(args[0]['value'], frame[var_name].value, frame[var_name].type), file=sys.stderr)
+
+    def _BREAK(self, args):
         gf = self.frames.get_gf()
         lf = self.frames.get_lf()
         tf = self.frames.get_tf()
@@ -355,20 +649,20 @@ class InstructionExecutor:
         print(f'Number of executed instructions: {self.insts.executed_count}\n', file=sys.stderr)
 
         print('Global Frame:', file=sys.stderr)
-        for id in gf:
-            print(f'GF@{id}={str(gf[id])}', file=sys.stderr)
+        for name in gf:
+            print(f'GF@{name}{"="+str(gf[name]) if str(gf[name]) != "" else "()"}', file=sys.stderr)
 
         print('\nLocal Frame:', file=sys.stderr)
-        for id in lf:
-            print(f'LF@{id}={str(lf[id])}', file=sys.stderr)
+        for name in lf:
+            print(f'LF@{name}{"="+str(lf[name]) if str(lf[name]) != "" else "()"}', file=sys.stderr)
 
         print('\nTemporary Frame:', file=sys.stderr)
-        for id in tf:
-            print(f'TF@{id}={str(tf[id])}', file=sys.stderr)
+        for name in tf:
+            print(f'TF@{name}{"="+str(tf[name]) if str(tf[name]) != "" else "()"}', file=sys.stderr)
 
         print('\nStack:', file=sys.stderr)
         for var in reversed(stack):
-            print(f'Stack@={str(var)}', file=sys.stderr)
+            print(f'Stack@={str(var) if str(var) != "" else ""}', file=sys.stderr)
 
 
 
