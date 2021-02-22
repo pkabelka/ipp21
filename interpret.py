@@ -95,15 +95,14 @@ class Instruction():
     def __init__(self, opcode, args):
         self.opcode = opcode
         self.args = args
-        # self.argc = len(self.args)
 
 
 class Instructions:
     def __init__(self):
-        self.instructions = []
-        self.pc = 0
-        self.calls = []
-        self.labels = {}
+        self._instructions = []
+        self._pc = 0
+        self._calls = []
+        self._labels = {}
         self.executed_count = 0
 
     def add(self, inst: Instruction):
@@ -114,29 +113,174 @@ class Instructions:
         Parameters:
             inst: Inst object to add to the list
         """
-        self.instructions.append(inst)
+        self._instructions.append(inst)
         if inst.opcode == 'LABEL':
-            if inst.args[0]['value'] in self.labels:
+            if inst.args[0]['value'] in self._labels:
                 exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" is already defined'.format(inst.args[0]['value']))
             # could be just len(self.instructions), because if you can jump, then there is definitely another instruction after label
-            self.labels[inst.args[0]['value']] = len(self.instructions) - 1
+            self._labels[inst.args[0]['value']] = len(self._instructions) - 1
 
     def next(self):
-        if self.pc < len(self.instructions):
-            self.pc += 1
+        if self._pc < len(self._instructions):
+            self._pc += 1
             self.executed_count += 1
-            return self.instructions[self.pc - 1]
+            return self._instructions[self._pc - 1]
         return None
 
     def jump(self, label):
-        if label not in self.labels:
+        if label not in self._labels:
             exit_err(Code.UNDEF_REDEF, f'Error: Label "{label}" is not defined')
-        self.pc = self.labels[label]
+        self._pc = self._labels[label]
+
+    def get_pc(self):
+        return self._pc
+
+
+
+class Var:
+    """Class representing a variable, has type and value"""
+    def __init__(self, type_, value):
+        self.type = type_
+        self.value = value
+
+    def __repr__(self):
+        return f'{str(self.value)}({self.type})'
+
+
+class Frames():
+    """Contains methods for controlling frame operations"""
+    def __init__(self):
+        self._lf_stack = []
+        self._gf = {}
+        self._tf = {}
+        self._tf_created = False
+
+    def createframe(self):
+        self._tf = {}
+        self._tf_created = True
+
+    def pushframe(self):
+        if not self._tf_created:
+            exit_err(Code.UNDEF_FRAME, 'Error: TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
+
+        self._lf_stack.append(self._tf)
+        self._tf_created = False
+
+    def popframe(self):
+        if len(self._lf_stack) == 0:
+            exit_err(Code.UNDEF_FRAME, 'Error: Cannot "POPFRAME", no frames on the frame stack')
+
+        self._tf = self._lf_stack.pop()
+        self._tf_created = True
+
+    def defvar(self, id):
+        """Defines a new variable
+
+        The method get the frame and variable name from id, checks if the
+        destination frame exists and creates a Var object containing the variable values
+
+        Parameters:
+            id: Variable identifier in this format: frame@identifier, e.g. LF@foo
+        """
+        frame_name, var_name = id.split('@', 1)
+        if frame_name == 'LF':
+            if len(self._lf_stack) == 0:
+                exit_err(Code.UNDEF_FRAME, 'Error: Cannot "DEFVAR", no frames on the frame stack')
+            frame = self._lf_stack[-1]
+
+        elif frame_name == 'TF':
+            if not self._tf_created:
+                exit_err(Code.UNDEF_FRAME, f'Error: Cannot "DEFVAR" "TF@{var_name}" because TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
+            frame = self._tf
+
+        elif frame_name == 'GF':
+            frame = self._gf
+
+        if var_name in frame:
+            exit_err(Code.UNDEF_REDEF, f'Error: Cannot "DEFVAR", "{frame_name}@{var_name}" is already defined')
+
+        frame[var_name] = Var(None, None)
+
+    def getvar(self, id):
+        frame_name, var_name = id.split('@', 1)
+        if frame_name == 'LF':
+            if len(self._lf_stack) == 0:
+                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "LF@{name} because frames on the frame stack')
+            frame = self._lf_stack[-1]
+
+        elif frame_name == 'TF':
+            if not self._tf_created:
+                exit_err(Code.UNDEF_FRAME, f'Error: "TF@{var_name}" because TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
+            frame = self._tf
+
+        elif frame_name == 'GF':
+            frame = self._gf
+
+        if var_name not in frame:
+            exit_err(Code.UNDEF_VAR, f'Error: "{frame_name}@{var_name}" is not defined')
+
+        return frame[var_name]
+
+    def setvar(self, id, var: Var):
+        frame, name = id.split('@', 1)
+        if frame == 'LF':
+            if len(self._lf_stack) == 0:
+                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "LF@{name} because frames on the frame stack')
+
+            if name not in self._lf_stack[-1]:
+                exit_err(Code.UNDEF_VAR, f'Error: "LF@{name}" is not defined')
+
+            self._lf_stack[-1][name] = var
+
+        elif frame == 'TF':
+            if not self._tf_created:
+                exit_err(Code.UNDEF_FRAME, f'Error: Cannot access "TF@{name}" because TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
+
+            if name not in self._tf:
+                exit_err(Code.UNDEF_VAR, f'Error: "TF@{name}" is not defined')
+
+            self._tf[name] = var
+
+        elif frame == 'GF':
+            if name not in self._gf:
+                exit_err(Code.UNDEF_VAR, f'Error: "GF@{name}" is not defined')
+
+            self._gf[name] = var
+
+    def get_gf(self):
+        return self._gf
+
+    def get_lf(self):
+        if len(self._lf_stack) > 0:
+            return self._lf_stack[-1]
+        return {}
+
+    def get_tf(self):
+        return self._tf
+
+
+class Stack:
+    def __init__(self):
+        self._stack = []
+
+    def pushs(self, var: Var):
+        self._stack.append(var)
+
+    def pops(self):
+        if len(self._stack) == 0:
+            exit_err(Code.MISSING_VAL, f'Error: Cannot "POPS", no value on the data stack')
+        return self._stack.pop()
+
+    def get_stack(self):
+        return self._stack
+
 
 
 class InstructionExecutor:
     def __init__(self, instructions):
         self.insts = instructions
+        self.frames = Frames()
+        self.stack = Stack()
 
     def interpret(self):
         while True:
@@ -145,27 +289,34 @@ class InstructionExecutor:
                 break
 
             if Instruction.opcode_exists(inst.opcode):
-                # print(self.insts.pc)
                 eval(f'self._{inst.opcode}(inst.args)')
 
     def _MOVE(self, args):
-        pass
+        if args[1]['type'] in ['int', 'string', 'bool', 'nil']:
+            self.frames.setvar(args[0]['value'], Var(args[1]['type'], args[1]['value']))
+        elif args[1]['type'] == 'var':
+            var = self.frames.getvar(args[0]['value'])
+            self.frames.setvar(args[0]['value'], var)
     def _CREATEFRAME(self, args):
-        pass
+        self.frames.createframe()
     def _PUSHFRAME(self, args):
-        pass
+        self.frames.pushframe()
     def _POPFRAME(self, args):
-        pass
+        self.frames.popframe()
     def _DEFVAR(self, args):
-        pass
+        self.frames.defvar(args[0]['value'])
     def _CALL(self, args):
         pass
     def _RETURN(self, args):
         pass
     def _PUSHS(self, args):
-        pass
+        if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
+            self.stack.pushs(Var(args[0]['type'], args[0]['value']))
+        elif args[0]['type'] == 'var':
+            var = self.frames.getvar(args[0]['value'])
+            self.stack.pushs(var)
     def _POPS(self, args):
-        pass
+        self.frames.setvar(args[0]['value'], self.stack.pops())
     def _ADD(self, args):
         pass
     def _SUB(self, args):
@@ -217,11 +368,30 @@ class InstructionExecutor:
     def _DPRINT(self, args):
         pass
     def _BREAK(self, args): # TODO
+        gf = self.frames.get_gf()
+        lf = self.frames.get_lf()
+        tf = self.frames.get_tf()
+        stack = self.stack.get_stack()
+
+        print(f'Current instruction: {self.insts.get_pc()}', file=sys.stderr)
         print(f'Number of executed instructions: {self.insts.executed_count}\n', file=sys.stderr)
-        print(f'Global Frame: \n', file=sys.stderr)
-        print(f'Local Frame: \n', file=sys.stderr)
-        print(f'Temporary Frame: \n', file=sys.stderr)
-        print(f'Stack: ', file=sys.stderr)
+
+        print('Global Frame:', file=sys.stderr)
+        for id in gf:
+            print(f'GF@{id}={str(gf[id])}', file=sys.stderr)
+
+        print('\nLocal Frame:', file=sys.stderr)
+        for id in lf:
+            print(f'LF@{id}={str(lf[id])}', file=sys.stderr)
+
+        print('\nTemporary Frame:', file=sys.stderr)
+        for id in tf:
+            print(f'TF@{id}={str(tf[id])}', file=sys.stderr)
+
+        print('\nStack:', file=sys.stderr)
+        for var in stack:
+            print(f'Stack@={str(var)}', file=sys.stderr)
+
 
 
 
