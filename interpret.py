@@ -252,8 +252,21 @@ class Var:
                     return Var('bool', str(int(self.value) == int(second.value)).lower())
                 except ValueError:
                     exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
-            elif self.type in ['int', 'string', 'bool', 'nil']:
+            elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value == second.value else 'false')
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
+
+    def __ne__(self, second):
+        if self.type == second.type:
+            if self.type == 'int':
+                try:
+                    return Var('bool', str(int(self.value) != int(second.value)).lower())
+                except ValueError:
+                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+            elif self.type in ['string', 'bool', 'nil']:
+                return Var('bool', 'true' if self.value != second.value else 'false')
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
@@ -597,16 +610,44 @@ class InstructionExecutor:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot concatenate the values, both not type string')
 
     def _STRLEN(self, args):
-        pass
+        symb = self.frames.const_var(args[1])
+        if symb.type != 'string':
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot get string length operand is not string')
+        self.frames.setvar(args[0]['value'], Var('int', len(symb.value)))
 
     def _GETCHAR(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type != 'string' or symb2.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
+        
+        if symb2.value < 0 or symb2.value >= len(symb1.value):
+            exit_err(Code.STRING_ERR, f'Error: Index out of range')
+
+        self.frames.setvar(args[0]['value'], Var('string', symb1.value[symb2.value]))
 
     def _SETCHAR(self, args):
-        pass
+        var = self.frames.const_var(args[0])
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+
+        if var.type != symb1.type != 'int' or symb2.type != 'string':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
+
+        if symb1.value < 0 or symb1.value >= len(symb2.value):
+            exit_err(Code.STRING_ERR, f'Error: Index out of range')
+
+        if len(symb2.value) == 0:
+            exit_err(Code.STRING_ERR, f'Error: Second operand is empty')
+
+        self.frames.setvar(args[0]['value'], Var('string', var.value[:symb1.value] + symb2.value[0] + var.value[symb1.value + 1:]))
 
     def _TYPE(self, args):
-        pass
+        symb = self.frames.const_var(args[1])
+        if symb.type is None:
+            self.frames.setvar(args[0]['value'], Var('string', ''))
+        else:
+            self.frames.setvar(args[0]['value'], Var('string', symb.type))
 
     def _LABEL(self, args):
         self.insts.dec_executed()
@@ -615,10 +656,22 @@ class InstructionExecutor:
         self.insts.jump(args[0]['value'])
 
     def _JUMPIFEQ(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            if (symb1 == symb2).value == 'true':
+                self.insts.jump(args[0]['value'])
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
     def _JUMPIFNEQ(self, args):
-        pass
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            if (symb1 != symb2).value == 'true':
+                self.insts.jump(args[0]['value'])
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
     def _EXIT(self, args):
         symb = self.frames.const_var(args[0])
@@ -736,7 +789,6 @@ class XMLParser():
 
     def _inst_syntax(self, inst):
         args = []
-        # args = {}
         opcode = inst.attrib['opcode'].upper()
         order = inst.attrib['order']
         if Instruction.opcode_args(opcode) is None:
@@ -804,7 +856,6 @@ class XMLParser():
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
 
             args.append({'type': arg.attrib['type'], 'value': arg.text})
-            # args[f'arg{arg_i}'] = {'type': arg.attrib['type'], 'value': arg.text}
             arg_i += 1
 
         return args
@@ -833,18 +884,11 @@ def main():
     elif (args.help == True and (args.source != sys.stdin or args.input != None)) or (args.source == sys.stdin and args.input == None):
         exit_err(Code.BAD_PARAM)
 
-    # print(args.source)
     xmlparser = XMLParser()
     instructions = xmlparser.parse(args.source)
 
     InstructionExecutor(instructions).interpret()
 
-
-
-
-
-    # for inst in instructions.instructions:
-    #     print(inst.args)
 
 
 if __name__ == '__main__':
