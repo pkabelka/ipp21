@@ -769,7 +769,9 @@ class XMLParser():
         inst_orders = {}
         for inst in root:
             if inst.tag != 'instruction':
-                exit_err(Code.BAD_STRUCT, f'Error: expected "instruction" tag, not "{inst.tag}"')
+                exit_err(Code.BAD_STRUCT, f'Error: Expected "instruction" tag, not "{inst.tag}"')
+            if len(inst.attrib) > 2:
+                exit_err(Code.BAD_STRUCT, 'Error: Too many argument attributes')
             if 'order' not in inst.attrib:
                 exit_err(Code.BAD_STRUCT, 'Error: "instruction" element is missing "order" attribute')
             if 'opcode' not in inst.attrib:
@@ -783,13 +785,24 @@ class XMLParser():
             except ValueError:
                 exit_err(Code.BAD_STRUCT, 'Error: "order" attribute must have a positive non-zero integer value')
 
-            if order in inst_orders: # duplicate instruction order
+            if int(order) in inst_orders: # duplicate instruction order
                 exit_err(Code.BAD_STRUCT, f'Error: Duplicate instruction order found: {order}')
-            inst_orders[order] = None
+            inst_orders[int(order)] = None
 
             # check instruction syntax
             args = self._inst_syntax(inst)
-            self.instructions.add(Instruction(opcode, args))
+
+            inst_orders[int(order)] = Instruction(opcode, args)
+
+        # check for missing order numbers
+        if len(inst_orders.keys()) > 0:
+            missing_orders = set(range(sorted(inst_orders.keys())[0], sorted(inst_orders.keys())[-1])) - set(inst_orders.keys())
+            if len(missing_orders) > 0:
+                exit_err(Code.BAD_STRUCT, f'Error: Missing instruction orders: {sorted(missing_orders)}')
+
+        # append the instructions in the correct order
+        for i in sorted(inst_orders):
+            self.instructions.add(inst_orders[i])
 
         return self.instructions
 
