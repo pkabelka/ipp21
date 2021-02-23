@@ -413,6 +413,13 @@ class InstructionExecutor:
         self.insts = instructions
         self.frames = Frames()
         self.stack = Stack()
+        self.input_file = sys.stdin
+
+    def set_input(self, input_file):
+        try:
+            self.input_file = open(input_file, 'r')
+        except Exception:
+            exit_err(Code.OPEN_ERR)
 
     def interpret(self):
         while True:
@@ -573,7 +580,7 @@ class InstructionExecutor:
         res_val = ''
         res_type = type_
         try:
-            input_val = input()
+            input_val = self.input_file.readline().rstrip('\n')
         except Exception:
             res_val = 'nil'
             res_type = 'nil'
@@ -887,8 +894,10 @@ def main():
     xmlparser = XMLParser()
     instructions = xmlparser.parse(args.source)
 
-    InstructionExecutor(instructions).interpret()
-
+    inst_ex = InstructionExecutor(instructions)
+    if args.input != None:
+        inst_ex.set_input(args.input)
+    inst_ex.interpret()
 
 
 if __name__ == '__main__':
