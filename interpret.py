@@ -315,6 +315,7 @@ class Frames():
         self._gf = {}
         self._tf = {}
         self._tf_created = False
+        self._init_vars = 0
 
     def createframe(self):
         self._tf = {}
@@ -335,10 +336,12 @@ class Frames():
         self._tf = self._lf_stack.pop()
         self._tf_created = True
 
+        self._check_init_vars()
+
     def defvar(self, id):
         """Defines a new variable
 
-        The method get the frame and variable name from id, checks if the
+        The method gets the frame and variable name from id, checks if the
         destination frame exists and creates a Var object containing the variable values
 
         Parameters:
@@ -390,6 +393,8 @@ class Frames():
         frame, var_name = self.getvar(id, check_init=False)
         frame[var_name] = var
 
+        self._check_init_vars()
+
     def get_gf(self):
         return self._gf
 
@@ -407,6 +412,16 @@ class Frames():
         elif var['type'] == 'var':
             frame, var_name = self.getvar(var['value'])
             return frame[var_name]
+
+    def _check_init_vars(self):
+        count = sum(var.value is not None for var in self.get_tf().values()) + \
+                sum(var.value is not None for var in self.get_lf().values()) + \
+                sum(var.value is not None for var in self.get_gf().values())
+        if count > self._init_vars:
+            self._init_vars = count
+
+    def get_init_vars(self):
+        return self._init_vars
 
 class Stack:
     def __init__(self):
