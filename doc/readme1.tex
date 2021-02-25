@@ -16,42 +16,45 @@
         Login: xkabel09
     }
 
-    \section{Parser}
+    \section{Analyzátor}
 
-    Skript \texttt{parse.php} provádějící lexikální a~syntaktickou analýzu je
+    Skript \emph{parse.php} provádějící lexikální a~syntaktickou analýzu je
     rozdělen do 4~hlavních tříd, které provádějí činnosti od kontroly vstupního
     kódu IPPcode21 až po generování reprezentace kódu ve formátu XML.
 
-    Zpracování začíná ve třídě \texttt{Parser} a~její metodou \texttt{parse}, ta
+    Zpracování začíná ve třídě \emph{Parser} a~její metodou \emph{parse}, ta
     nejprve zpracuje parametry se kterými byl skript spuštěn a~pokračuje
-    vytvořením instancí tříd \texttt{Output} a~\texttt{Inst}. Oba tyto objekty
-    jsou průběžně používány uvnitř cyklu \texttt{while} který načítá instrukce
+    vytvořením instancí tříd \emph{Output} a~\emph{Inst}. Oba tyto objekty
+    jsou průběžně používány uvnitř cyklu \emph{while} který načítá instrukce
     tak dlouho, dokud nedojdou instrukce ke zpracování. Tento cyklus slouží
     k~zapsání jednotlivých instrukcí a jejich argumentů do XML reprezentace.
-    Samotná analýza kódu probíhá v~metodě \texttt{next} třídy \texttt{Inst}.
+    Samotná analýza kódu probíhá v~metodě \emph{next} třídy \emph{Inst}.
 
     Načtení a~zpracování instrukce začíná načtením řádku ze standardního vstupu
     (STDIN) a~oříznutím komentářů a~nadbytečných bílých znaků. První kontrolou
-    je nalezení hlavičky \texttt{.IPPcode21} a~následně se řádek rozdělí podle
+    je nalezení hlavičky \emph{.IPPcode21} a~následně se řádek rozdělí podle
     mezer na část s~operačním kódem a~část s~argumenty. Kontrolu typů
     a~počtu argumentů se snadno provádí díky konstatní proměnné
-    \texttt{INST\_MAP}, která slouží jako šablona pro všechny zpracovávané
+    \emph{INST\_MAP}, která slouží jako šablona pro všechny zpracovávané
     instrukce. Každá instrukce je klíčem do tohoto asociativního pole a~každá
     má své pole s~typy operandů v~pořadí v~jakém je instrukce příjmá. Operační
-    kód se kontroluje existencí klíče v~\texttt{INST\_MAP}. Lexikální
+    kód se kontroluje existencí klíče v~\emph{INST\_MAP}. Lexikální
     a~syntaktická správnost argumentů je ověřena kontrolou správného typu
     operandu a~jeho hodnot pomocí regulárních výrazů.
 
-    Tvorbu výstupního XML zajišťuje třída \texttt{Output}, která využívá
-    knihovnu \texttt{XMLWriter} pro sestavení elementů a~jejich atributů.
+    Tvorbu výstupního XML zajišťuje třída \emph{Output}, která využívá
+    knihovnu \emph{XMLWriter} pro sestavení elementů a~jejich atributů.
 
     \subsection{Rozšíření}
 
-    Jediným možným a~také implementovaným rozšířením je \textbf{STATP},
-    umožňující sběr skupin statistik o~analyzovaném kódu. Třída \texttt{Stats}
+    V~rámci řešení 1.~projektu jsem implementoval rozšíření \textbf{STATP},
+    umožňující sběr skupin statistik o~analyzovaném kódu. Třída \emph{Stats}
     obsahuje statické metody pro inkrementaci či dekrementaci hodnot statistik
     určených jejich názvem. Pro zápis do souborů statistik slouží metoda
-    \texttt{write}, která očekává asociativní pole kde klíče jsou názvy souborů
+    \emph{write}, která očekává asociativní pole kde klíče jsou názvy souborů
     a~hodnoty jsou pole jejichž položkami jsou názvy statistik.
+
+    Kvůli kompatibilitě analyzátoru s~interpretem jsem také implementoval
+    zásobníkové instrukce.
 
 \end{document}
