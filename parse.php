@@ -39,6 +39,9 @@ function exit_err($code, $text)
     exit($code);
 }
 
+/**
+ * Class for parsing arguments and IPPcode21 source code
+ */
 class Parser
 {
     private $stats;
@@ -111,6 +114,17 @@ class Parser
         return $stat_groups;
     }
 
+    /**
+     * Parses IPPcode21 source code and checks lexical and syntactical correctness
+     * 
+     * Each call of the Inst->next() method loads another instruction from
+     * standard input and does lexical and syntactical analysis
+     * 
+     * After successful analysis of the instruction, we generate the XML tags
+     * and attributes for the instruction and its arguments
+     * 
+     * @param argv Script arguments
+     */
     public function parse(array $argv)
     {
         $this->stat_groups = $this->parse_args($argv);
@@ -146,6 +160,9 @@ class Parser
     }
 }
 
+/**
+ * Class for loading and checking instructions
+ */
 class Inst
 {
     private $lnum;
@@ -155,6 +172,12 @@ class Inst
     private $labels;
     private $fwjumps;
 
+    /**
+     * Template for instructions
+     * 
+     * Each instruction opcode points to an array with operand types which it
+     * accepts
+     */
     private const INST_MAP = array(
         'MOVE' => array('var', 'symb'),
         'CREATEFRAME' => array(),
@@ -265,7 +288,16 @@ class Inst
     }
 
     /**
-     * Checks if the instruction is lexiacally and syntactically correct and parses it into opcode and args
+     * Checks if the instruction is lexiacally and syntactically correct and
+     * parses it into opcode and args
+     * 
+     * Lexical analysis is done by checking if the opcode of the instruction on
+     * the line is found in INST_MAP array
+     * 
+     * Syntactical analysis is done by checking if the number of arguments and
+     * their type matches the template of the arguments in INST_MAP
+     * 
+     * Each argument type is checked with regular expressions
      * 
      * @param inst Array with an instruction delimited by ' '
      * @return int Return code 
@@ -401,6 +433,13 @@ class Inst
         return Code::SUCCESS;
     }
 
+    /**
+     * Finds the first # and removes all content until end of line
+     * 
+     * The function works in-place on the line parameter
+     * 
+     * @param line String to trim comments in
+     */
     public static function trim_comments(&$line)
     {
         if (($pos = strpos($line, '#')) !== false)
@@ -410,16 +449,26 @@ class Inst
         }
     }
 
+    /**
+     * Returns instruction opcode
+     */
     public function get_opcode(): string
     {
         return $this->opcode;
     }
 
+    /**
+     * Returns instruction arguments
+     */
     public function get_args(): array
     {
         return $this->args;
     }
 
+    /**
+     * Checks fwjumps array if all labels are defined in labels array. If the
+     * label is not found, it decrements fwjumps and increments badjumps stats.
+     */
     public function check_fwjumps()
     {
         foreach ($this->fwjumps as $label => $null)
@@ -440,6 +489,11 @@ class Stats
 {
     public static $stats = array('loc' => 0, 'comments' => 0, 'labels' => 0, 'jumps' => 0, 'fwjumps' => 0, 'backjumps' => 0, 'badjumps' => 0); // contains the stat values
 
+    /**
+     * Increments the statistic with the given key
+     * 
+     * @param key Statistic key to increment
+     */
     public static function inc($key)
     {
         if (array_key_exists($key, self::$stats))
@@ -448,6 +502,11 @@ class Stats
         }
     }
 
+    /**
+     * Decrements the statistic with the given key
+     * 
+     * @param key Statistic key to decrement
+     */
     public static function dec($key)
     {
         if (array_key_exists($key, self::$stats))
@@ -499,6 +558,11 @@ class Output
         $this->arg_order = 1;
     }
 
+    /**
+     * Starts "instruction" element
+     * 
+     * Automatically increments order for each instruction element
+     */
     public function inst(string $opcode)
     {
         $this->arg_order = 1;
@@ -507,6 +571,11 @@ class Output
         $this->xmlw->writeAttribute('opcode', strtoupper($opcode));
     }
 
+    /**
+     * Starts "argN" element
+     * 
+     * Automatically increments order for each arg element
+     */
     public function arg(string $type, string $val)
     {
         $this->xmlw->startElement('arg'.$this->arg_order++);
