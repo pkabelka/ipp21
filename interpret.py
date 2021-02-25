@@ -349,7 +349,7 @@ class Frames():
 
         frame[var_name] = Var(None, None)
 
-    def getvar(self, id):
+    def getvar(self, id, check_init=True):
         frame_name, var_name = id.split('@', 1)
         if frame_name == 'LF':
             if len(self._lf_stack) == 0:
@@ -367,10 +367,13 @@ class Frames():
         if var_name not in frame:
             exit_err(Code.UNDEF_VAR, f'Error: "{frame_name}@{var_name}" is not defined')
 
+        if check_init and (frame[var_name].type is None or frame[var_name].value is None):
+            exit_err(Code.MISSING_VAL, f'Error: Cannot read from "{frame_name}@{var_name}" because it is not initialized')
+
         return frame, var_name
 
     def setvar(self, id, var: Var):
-        frame, var_name = self.getvar(id)
+        frame, var_name = self.getvar(id, check_init=False)
         frame[var_name] = var
 
     def get_gf(self):
@@ -400,7 +403,7 @@ class Stack:
 
     def pops(self):
         if len(self._stack) == 0:
-            exit_err(Code.MISSING_VAL, f'Error: Cannot "POPS", no value on the data stack')
+            exit_err(Code.MISSING_VAL, 'Error: Cannot "POPS", no value on the data stack')
         return self._stack.pop()
 
     def get_stack(self):
@@ -688,6 +691,7 @@ class InstructionExecutor:
             exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
 
     def _DPRINT(self, args):
+        self.insts.dec_executed()
         if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
             print('Const@={}({})'.format(args[0]['value'], args[0]['type']), file=sys.stderr)
 
@@ -700,6 +704,7 @@ class InstructionExecutor:
                 print('{}={}({})'.format(args[0]['value'], frame[var_name].value, frame[var_name].type), file=sys.stderr)
 
     def _BREAK(self, args):
+        self.insts.dec_executed()
         gf = self.frames.get_gf()
         lf = self.frames.get_lf()
         tf = self.frames.get_tf()
@@ -793,12 +798,6 @@ class XMLParser():
             args = self._inst_syntax(inst)
 
             inst_orders[int(order)] = Instruction(opcode, args)
-
-        # check for missing order numbers
-        if len(inst_orders.keys()) > 0:
-            missing_orders = set(range(sorted(inst_orders.keys())[0], sorted(inst_orders.keys())[-1])) - set(inst_orders.keys())
-            if len(missing_orders) > 0:
-                exit_err(Code.BAD_STRUCT, f'Error: Missing instruction orders: {sorted(missing_orders)}')
 
         # append the instructions in the correct order
         for i in sorted(inst_orders):
@@ -896,12 +895,12 @@ def main():
     parser.add_argument('-h', '--help', action='store_true', help='show this help message and exit', default=False)
     parser.add_argument('-s', '--source', metavar='SOURCE_FILE', action='store', help='XML source code', default=sys.stdin)
     parser.add_argument('-i', '--input', metavar='INPUT_FILE', action='store', help='Input to feed into STDIN', default=None)
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
 
-    if args.help == True and args.source == None and args.input == None:
+    if args.help == True and args.source == sys.stdin and args.input == None:
         parser.print_help()
         exit(0)
-    elif (args.help == True and (args.source != sys.stdin or args.input != None)) or (args.source == sys.stdin and args.input == None):
+    elif (args.help == True and (args.source != sys.stdin or args.input != None)) or (args.source == sys.stdin and args.input == None) or len(rest) > 0:
         exit_err(Code.BAD_PARAM)
 
     xmlparser = XMLParser()
