@@ -6,7 +6,6 @@
 """
 
 import sys
-import argparse
 import os
 import re
 from enum import Enum
@@ -53,17 +52,29 @@ class Instruction():
         'PUSHS': tuple(['symb']),
         'POPS': tuple(['var']),
         'ADD': ('var', 'symb', 'symb'),
+        'ADDS': tuple(),
         'SUB': ('var', 'symb', 'symb'),
+        'SUBS': tuple(),
         'MUL': ('var', 'symb', 'symb'),
+        'MULS': tuple(),
         'IDIV': ('var', 'symb', 'symb'),
+        'IDIVS': tuple(),
         'LT': ('var', 'symb', 'symb'),
+        'LTS': tuple(),
         'GT': ('var', 'symb', 'symb'),
+        'GTS': tuple(),
         'EQ': ('var', 'symb', 'symb'),
+        'EQS': tuple(),
         'AND': ('var', 'symb', 'symb'),
+        'ANDS': tuple(),
         'OR': ('var', 'symb', 'symb'),
+        'ORS': tuple(),
         'NOT': ('var', 'symb'),
+        'NOTS': tuple(),
         'INT2CHAR': ('var', 'symb'),
+        'INT2CHARS': tuple(),
         'STRI2INT': ('var', 'symb', 'symb'),
+        'STRI2INTS': tuple(),
         'READ': ('var', 'type'),
         'WRITE': tuple(['symb']),
         'CONCAT': ('var', 'symb', 'symb'),
@@ -74,7 +85,10 @@ class Instruction():
         'LABEL': tuple(['label']),
         'JUMP': tuple(['label']),
         'JUMPIFEQ': ('label', 'symb', 'symb'),
+        'JUMPIFEQS': tuple(),
         'JUMPIFNEQ': ('label', 'symb', 'symb'),
+        'JUMPIFNEQS': tuple(),
+        'CLEARS': tuple(),
         'EXIT': tuple(['symb']),
         'DPRINT': tuple(['symb']),
         'BREAK': tuple()
@@ -406,6 +420,9 @@ class Stack:
             exit_err(Code.MISSING_VAL, 'Error: Cannot "POPS", no value on the data stack')
         return self._stack.pop()
 
+    def clears(self):
+        self._stack = []
+
     def get_stack(self):
         return self._stack
 
@@ -477,6 +494,14 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
 
+    def _ADDS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.stack.pushs(symb1 + symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
+
     def _SUB(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
@@ -486,6 +511,14 @@ class InstructionExecutor:
             exit_err(Code.STRING_ERR, 'Error: Cannot subtract strings')
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, both not type int')
+
+    def _SUBS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.stack.pushs(symb1 - symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
 
     def _MUL(self, args):
         symb1 = self.frames.const_var(args[1])
@@ -497,6 +530,14 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, both not type int')
 
+    def _MULS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.stack.pushs(symb1 * symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
+
     def _IDIV(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
@@ -507,11 +548,27 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not type int')
 
+    def _IDIVS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'int' and symb2.type == 'int':
+            self.stack.pushs(symb1 // symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
+
     def _LT(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
         if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
             self.frames.setvar(args[0]['value'], symb1 < symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
+    def _LTS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+            self.stack.pushs(symb1 < symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -523,11 +580,27 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
+    def _GTS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+            self.stack.pushs(symb1 > symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _EQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
         if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
             self.frames.setvar(args[0]['value'], symb1 == symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
+    def _EQS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            self.stack.pushs(symb1 == symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -539,11 +612,27 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
+    def _ANDS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'bool' and symb2.type == 'bool':
+            self.stack.pushs(symb1 and symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _OR(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'bool' and symb2.type == 'bool':
             self.frames.setvar(args[0]['value'], symb1 or symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
+    def _ORS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'bool' and symb2.type == 'bool':
+            self.stack.pushs(symb1 or symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -554,12 +643,28 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot negate value')
 
+    def _NOTS(self, args):
+        symb = self.stack.pops()
+        if symb.type == 'bool':
+            self.stack.pushs(~symb)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot negate value')
+
     def _INT2CHAR(self, args):
         symb = self.frames.const_var(args[1])
         if symb.type != 'int':
             exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to char')
         try:
             self.frames.setvar(args[0]['value'], Var('string', chr(symb.value)))
+        except ValueError:
+            exit_err(Code.BAD_OPERAND_VAL, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
+
+    def _INT2CHARS(self, args):
+        symb = self.stack.pops()
+        if symb.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to char')
+        try:
+            self.stack.pushs(Var('string', chr(symb.value)))
         except ValueError:
             exit_err(Code.BAD_OPERAND_VAL, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
 
@@ -573,6 +678,17 @@ class InstructionExecutor:
             exit_err(Code.STRING_ERR, f'Error: Index out of range')
 
         self.frames.setvar(args[0]['value'], Var('int', ord(symb1.value[symb2.value])))
+
+    def _STRI2INTS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type != 'string' or symb2.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
+        
+        if symb2.value < 0 or symb2.value >= len(symb1.value):
+            exit_err(Code.STRING_ERR, f'Error: Index out of range')
+
+        self.stack.pushs(Var('int', ord(symb1.value[symb2.value])))
 
     def _READ(self, args):
         if args[1]['value'] not in ['int', 'string', 'bool']:
@@ -674,6 +790,15 @@ class InstructionExecutor:
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
+    def _JUMPIFEQS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            if (symb1 == symb2).value == 'true':
+                self.insts.jump(args[0]['value'])
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
     def _JUMPIFNEQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
@@ -682,6 +807,18 @@ class InstructionExecutor:
                 self.insts.jump(args[0]['value'])
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
+    def _JUMPIFNEQS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+            if (symb1 != symb2).value == 'true':
+                self.insts.jump(args[0]['value'])
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
+
+    def _CLEARS(self, args):
+        self.stack.clears()
 
     def _EXIT(self, args):
         symb = self.frames.const_var(args[0])
@@ -918,7 +1055,6 @@ def parse_args():
         exit(0)
 
     elif len(args) > 0 and '--help' not in args and (any(source_arg) or any(input_arg)):
-        print(source_arg)
         if any(source_arg):
             if len(source_arg) == 1:
                 _, source_file = source_arg[0].split('=', 1)
