@@ -315,7 +315,7 @@ class Inst
      * Each argument type is checked with regular expressions
      * 
      * @param inst Array with an instruction delimited by ' '
-     * @return int Return code 
+     * @return int Return code
      */
     private function syntax(array $inst): int
     {

@@ -36,7 +36,7 @@ def exit_err(code, message=''):
     if message == '':
         if code in err_messages:
             message = err_messages[code]
-    
+
     print(message, file=sys.stderr)
     exit(code.value)
 
@@ -673,7 +673,7 @@ class InstructionExecutor:
         symb2 = self.frames.const_var(args[2])
         if symb1.type != 'string' or symb2.type != 'int':
             exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
-        
+
         if symb2.value < 0 or symb2.value >= len(symb1.value):
             exit_err(Code.STRING_ERR, f'Error: Index out of range')
 
@@ -684,7 +684,7 @@ class InstructionExecutor:
         symb1 = self.stack.pops()
         if symb1.type != 'string' or symb2.type != 'int':
             exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
-        
+
         if symb2.value < 0 or symb2.value >= len(symb1.value):
             exit_err(Code.STRING_ERR, f'Error: Index out of range')
 
@@ -717,7 +717,7 @@ class InstructionExecutor:
                 res_type = 'nil'
         elif type_ == 'string':
             res_val = input_val
-        
+
         self.frames.setvar(args[0]['value'], Var(res_type, res_val))
 
     def _WRITE(self, args):
@@ -746,7 +746,7 @@ class InstructionExecutor:
         symb2 = self.frames.const_var(args[2])
         if symb1.type != 'string' or symb2.type != 'int':
             exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
-        
+
         if symb2.value < 0 or symb2.value >= len(symb1.value):
             exit_err(Code.STRING_ERR, f'Error: Index out of range')
 
