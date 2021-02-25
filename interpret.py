@@ -412,17 +412,17 @@ class Stack:
 
 
 class InstructionExecutor:
-    def __init__(self, instructions):
+    def __init__(self, instructions, input_file):
         self.insts = instructions
         self.frames = Frames()
         self.stack = Stack()
-        self.input_file = sys.stdin
-
-    def set_input(self, input_file):
-        try:
-            self.input_file = open(input_file, 'r')
-        except Exception:
-            exit_err(Code.OPEN_ERR)
+        if input_file == sys.stdin:
+            self.input_file = input_file
+        else:
+            try:
+                self.input_file = open(input_file, 'r')
+            except Exception:
+                exit_err(Code.OPEN_ERR)
 
     def interpret(self):
         while True:
@@ -890,25 +890,62 @@ class XMLParser():
         return chr(int(match.group(1)))
 
 
-def main():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('-h', '--help', action='store_true', help='show this help message and exit', default=False)
-    parser.add_argument('-s', '--source', metavar='SOURCE_FILE', action='store', help='XML source code', default=sys.stdin)
-    parser.add_argument('-i', '--input', metavar='INPUT_FILE', action='store', help='Input to feed into STDIN', default=None)
-    args, rest = parser.parse_known_args()
-
-    if args.help == True and args.source == sys.stdin and args.input == None:
-        parser.print_help()
-        exit(0)
-    elif (args.help == True and (args.source != sys.stdin or args.input != None)) or (args.source == sys.stdin and args.input == None) or len(rest) > 0:
+def parse_args():
+    if len(sys.argv) <= 1:
         exit_err(Code.BAD_PARAM)
 
-    xmlparser = XMLParser()
-    instructions = xmlparser.parse(args.source)
+    args = sys.argv[1:]
 
-    inst_ex = InstructionExecutor(instructions)
-    if args.input != None:
-        inst_ex.set_input(args.input)
+    for arg in args:
+        valid = any(arg.startswith(valid_arg) for valid_arg in ['--help', '--source=', '--input=', '--stats=', '--insts', '--hot', '--vars'])
+        if not valid:
+            exit_err(Code.BAD_PARAM)
+
+    source_arg = [arg for arg in args if arg.startswith('--source=')]
+    input_arg = [arg for arg in args if arg.startswith('--input=')]
+
+    if len(args) == 1 and '--help' in args:
+        print('usage: interpret.py [--help] [--source=SOURCE_FILE] [--input=INPUT_FILE] [--stats=OUTPUT_FILE [--insts] [--hot] [--vars]]\n')
+        print('arguments:')
+        print('  --help                  show this help message and exit')
+        print('  --source=SOURCE_FILE    IPPcode21 source XML')
+        print('  --input=INPUT_FILE      inputs to pass into READ instruction')
+        print('  --stats=OUTPUT_FILE     file to write stats into')
+        print('  --insts                 write number of executed instructions into stats')
+        print('  --hot                   write the smallest order of the most executed instruction into stats')
+        print('  --vars                  write the maximum number of initialized variables across all frames into stats\n')
+        print('Statistic arguments can only be used after --stats argument is specified')
+        exit(0)
+
+    elif len(args) > 0 and '--help' not in args and (any(source_arg) or any(input_arg)):
+        print(source_arg)
+        if any(source_arg):
+            if len(source_arg) == 1:
+                _, source_file = source_arg[0].split('=', 1)
+            else:
+                exit_err(Code.BAD_PARAM)
+        else:
+            source_file = sys.stdin
+
+        if any(input_arg):
+            if len(input_arg) == 1:
+                _, input_file = input_arg[0].split('=', 1)
+            else:
+                exit_err(Code.BAD_PARAM)
+        else:
+            input_file = sys.stdin
+    else:
+        exit_err(Code.BAD_PARAM)
+
+    return source_file, input_file
+
+
+def main():
+    source_file, input_file = parse_args()
+    xmlparser = XMLParser()
+    instructions = xmlparser.parse(source_file)
+
+    inst_ex = InstructionExecutor(instructions, input_file)
     inst_ex.interpret()
 
 
