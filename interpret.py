@@ -30,6 +30,7 @@ def exit_err(code, message=''):
     err_messages = {
         Code.BAD_PARAM: 'Error: Wrong combination of parameters\nRun only with --help to show help',
         Code.OPEN_ERR: 'Error: Cannot open file',
+        Code.WRITE_ERR: 'Error cannot open file for writing',
         Code.BAD_XML: 'Error: Wrong XML format. XML is not well-formed',
         Code.BAD_STRUCT: 'Error: Wrong XML structure'
     }
@@ -448,6 +449,7 @@ class InstructionExecutor:
         self.insts = instructions
         self.frames = Frames()
         self.stack = Stack()
+        self.exec_per_inst = {}
         if input_file == sys.stdin:
             self.input_file = input_file
         else:
@@ -464,6 +466,15 @@ class InstructionExecutor:
 
             if Instruction.opcode_exists(inst.opcode):
                 eval(f'self._{inst.opcode}(inst.args)')
+                if inst.opcode in self.exec_per_inst:
+                    self.exec_per_inst[inst.opcode] += 1
+                else:
+                    self.exec_per_inst[inst.opcode] = 1
+
+        if 'LABEL' in self.exec_per_inst: del(self.exec_per_inst['LABEL'])
+        if 'BREAK' in self.exec_per_inst: del(self.exec_per_inst['BREAK'])
+        if 'DPRINT' in self.exec_per_inst: del(self.exec_per_inst['DPRINT'])
+        self.exec_per_inst = dict(reversed(sorted(self.exec_per_inst.items(), key=lambda item: item[1])))
 
     def _MOVE(self, args):
         if args[1]['type'] in ['int', 'string', 'bool', 'nil']:
@@ -888,6 +899,7 @@ class XMLParser():
     """Contains parse function to parse XML document into Instructions class"""
     def __init__(self):
         self.instructions = Instructions()
+        self.tree = None
 
 
     def parse(self, source_path):
@@ -901,7 +913,7 @@ class XMLParser():
         """
 
         try:
-            tree = ET.parse(source_path)
+            self.tree = ET.parse(source_path)
         except FileNotFoundError:
             exit_err(Code.OPEN_ERR)
         except PermissionError:
@@ -909,7 +921,7 @@ class XMLParser():
         except ET.ParseError:
             exit_err(Code.BAD_XML)
 
-        root = tree.getroot()
+        root = self.tree.getroot()
 
         # check XML structure
         if root.tag != 'program':
@@ -1055,6 +1067,9 @@ def parse_args():
 
     source_arg = [arg for arg in args if arg.startswith('--source=')]
     input_arg = [arg for arg in args if arg.startswith('--input=')]
+    stats_arg = [arg for arg in args if arg.startswith('--stats=')]
+    stats_path = False
+    stats_group = []
 
     if len(args) == 1 and '--help' in args:
         print('usage: interpret.py [--help] [--source=SOURCE_FILE] [--input=INPUT_FILE] [--stats=OUTPUT_FILE [--insts] [--hot] [--vars]]\n')
@@ -1073,6 +1088,7 @@ def parse_args():
         if any(source_arg):
             if len(source_arg) == 1:
                 _, source_file = source_arg[0].split('=', 1)
+                args.remove(source_arg[0])
             else:
                 exit_err(Code.BAD_PARAM)
         else:
@@ -1081,6 +1097,7 @@ def parse_args():
         if any(input_arg):
             if len(input_arg) == 1:
                 _, input_file = input_arg[0].split('=', 1)
+                args.remove(input_arg[0])
             else:
                 exit_err(Code.BAD_PARAM)
         else:
@@ -1088,17 +1105,43 @@ def parse_args():
     else:
         exit_err(Code.BAD_PARAM)
 
-    return source_file, input_file
+    if len(stats_arg) == 1 and args[0] == stats_arg[0]:
+        _, stats_path = stats_arg[0].split('=', 1)
+        stats_group = args[1:]
+    else:
+        exit_err(Code.BAD_PARAM)
+
+    return source_file, input_file, stats_path, stats_group
 
 
 def main():
-    source_file, input_file = parse_args()
+    source_file, input_file, stats_path, stats_group = parse_args()
     xmlparser = XMLParser()
     instructions = xmlparser.parse(source_file)
 
     inst_ex = InstructionExecutor(instructions, input_file)
     inst_ex.interpret()
 
+    if stats_path:
+        if (len(inst_ex.exec_per_inst)) > 0:
+            most_exec = list(inst_ex.exec_per_inst.keys())[0]
+            insts = xmlparser.tree.getroot().findall(f'.//instruction[@opcode="{most_exec}"]')
+            min_order = int(insts[0].attrib['order'])
+            if len(insts) > 1:
+                for inst in insts:
+                    min_order = min(min_order, int(inst.attrib['order']))
+
+        try:
+            with open(stats_path, 'w+') as stat_file:
+                for stat in stats_group:
+                    if stat == '--insts':
+                        stat_file.write(f'{inst_ex.insts.executed_count}\n')
+                    elif stat == '--hot':
+                        stat_file.write(f'{min_order}\n')
+                    elif stat == '--vars':
+                        stat_file.write(f'{inst_ex.frames.get_init_vars()}\n')
+        except Exception:
+            exit_err(Code.WRITE_ERR)
 
 if __name__ == '__main__':
     main()
