@@ -945,7 +945,11 @@ class XMLParser():
                 exit_err(Code.BAD_STRUCT, 'Error: "instruction" element is missing "order" attribute')
             if 'opcode' not in inst.attrib:
                 exit_err(Code.BAD_STRUCT, 'Error: "instruction" element is missing "opcode" attribute')
-            opcode = inst.attrib['opcode'].upper()
+
+            for c in inst.attrib['opcode']:
+                if not c.isupper():
+                    exit_err(Code.BAD_STRUCT, f'Error: Invalid character "{c}" in "opcode" attribute value')
+            opcode = inst.attrib['opcode']
             order = inst.attrib['order']
 
             try:
@@ -972,7 +976,7 @@ class XMLParser():
 
     def _inst_syntax(self, inst):
         args = []
-        opcode = inst.attrib['opcode'].upper()
+        opcode = inst.attrib['opcode']
         order = inst.attrib['order']
         if Instruction.opcode_args(opcode) is None:
             exit_err(Code.BAD_STRUCT, 'Error: Unknown instruction opcode "{}" with order "{}"'.format(inst.attrib['opcode'], order))
