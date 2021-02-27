@@ -952,11 +952,11 @@ class XMLParser():
             if 'opcode' not in inst.attrib:
                 exit_err(Code.BAD_STRUCT, 'Error: "instruction" element is missing "opcode" attribute')
 
-            for c in inst.attrib['opcode']:
-                if not c.isupper():
-                    exit_err(Code.BAD_STRUCT, f'Error: Invalid character "{c}" in "opcode" attribute value')
+
             opcode = inst.attrib['opcode']
             order = inst.attrib['order']
+            if not re.match(r'^[A-Z0-9]+$', opcode):
+                exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": Invalid characters in opcode: "{opcode}"')
 
             try:
                 if int(order) < 1:
