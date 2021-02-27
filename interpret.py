@@ -266,11 +266,14 @@ class Var:
                 try:
                     return Var('bool', str(int(self.value) == int(second.value)).lower())
                 except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Wrong int type value')
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value == second.value else 'false')
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+
+        elif self.type == 'nil' or second.type == 'nil':
+            return Var('bool', 'false')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
 
     def __ne__(self, second):
@@ -279,11 +282,14 @@ class Var:
                 try:
                     return Var('bool', str(int(self.value) != int(second.value)).lower())
                 except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Wrong int type value')
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value != second.value else 'false')
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, wrong operand types')
+
+        elif self.type == 'nil' or second.type == 'nil':
+            return Var('bool', 'true')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare the values, both not of same type')
 
     def __and__(self, second):
@@ -617,7 +623,7 @@ class InstructionExecutor:
     def _EQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             self.frames.setvar(args[0]['value'], symb1 == symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -625,7 +631,7 @@ class InstructionExecutor:
     def _EQS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             self.stack.pushs(symb1 == symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -810,7 +816,7 @@ class InstructionExecutor:
     def _JUMPIFEQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 == symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
         else:
@@ -819,7 +825,7 @@ class InstructionExecutor:
     def _JUMPIFEQS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 == symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
         else:
@@ -828,7 +834,7 @@ class InstructionExecutor:
     def _JUMPIFNEQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 != symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
         else:
@@ -837,7 +843,7 @@ class InstructionExecutor:
     def _JUMPIFNEQS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool', 'nil']:
+        if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 != symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
         else:
@@ -1022,6 +1028,9 @@ class XMLParser():
                 elif arg.attrib['type'] == 'var':
                     self._var_syntax(arg, order, arg_i)
 
+                elif arg.attrib['type'] == 'float': # ^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$
+                    pass
+
 
             elif pos_type == 'var':
                 self._var_syntax(arg, order, arg_i)
@@ -1109,11 +1118,12 @@ def parse_args():
     else:
         exit_err(Code.BAD_PARAM)
 
-    if len(stats_arg) == 1 and args[0] == stats_arg[0]:
-        _, stats_path = stats_arg[0].split('=', 1)
-        stats_group = args[1:]
-    else:
-        exit_err(Code.BAD_PARAM)
+    if len(stats_arg) == 1:
+        if args[0] == stats_arg[0]:
+            _, stats_path = stats_arg[0].split('=', 1)
+            stats_group = args[1:]
+        else:
+            exit_err(Code.BAD_PARAM)
 
     return source_file, input_file, stats_path, stats_group
 
