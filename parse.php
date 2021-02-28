@@ -196,6 +196,8 @@ class Inst
         'MULS' => array(),
         'IDIV' => array('var', 'symb', 'symb'),
         'IDIVS' => array(),
+        'DIV' => array('var', 'symb', 'symb'),
+        'DIVS' => array(),
         'LT' => array('var', 'symb', 'symb'),
         'LTS' => array(),
         'GT' => array('var', 'symb', 'symb'),
@@ -212,6 +214,10 @@ class Inst
         'INT2CHARS' => array(),
         'STRI2INT' => array('var', 'symb', 'symb'),
         'STRI2INTS' => array(),
+        'INT2FLOAT' => array('var', 'symb'),
+        'INT2FLOATS' => array(),
+        'FLOAT2INT' => array('var', 'symb'),
+        'FLOAT2INTS' => array(),
         'READ' => array('var', 'type'),
         'WRITE' => array('symb'),
         'CONCAT' => array('var', 'symb', 'symb'),
@@ -339,7 +345,7 @@ class Inst
             {
                 switch ($pos_type) {
                     case 'symb':
-                        if (preg_match('/^(?:int|string|bool|nil)@.*$/', $args[$i]))
+                        if (preg_match('/^(?:int|string|bool|nil|float)@.*$/', $args[$i]))
                         {
                             $symb = explode('@', $args[$i], 2);
                             $symb_type = $symb[0];
@@ -377,6 +383,14 @@ class Inst
                                     }
                                     $this->args[] = array($symb_type => $symb_val);
                                     break;
+
+                                case 'float':
+                                    if (!preg_match('/^[+-]?(?:0[xX])?[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?(?:[pP][+-]?[0-9]+)?$/', $symb_val))
+                                    {
+                                        return Code::PARSE_ERR;
+                                    }
+                                    $this->args[] = array($symb_type => $symb_val);
+                                    break;
                                 default:
                                     break;
                             }
@@ -392,7 +406,7 @@ class Inst
                         break;
 
                     case 'type':
-                        if (!preg_match('/^(?:int|string|bool)$/', $args[$i]))
+                        if (!preg_match('/^(?:int|string|bool|float)$/', $args[$i]))
                         {
                             return Code::PARSE_ERR;
                         }
