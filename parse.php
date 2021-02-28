@@ -66,7 +66,19 @@ class Parser
         $argc = count($argv);
         if ($argc === 1 && in_array('--help', $argv))
         {
-            exit_err(Code::BAD_PARAM, "This script reads IPPcode21 from standard input, performs lexical\nand syntactical analysis and converts the instructions into XML representation\n");
+            $message = "This script reads IPPcode21 from standard input, performs lexical\nand syntactical analysis and converts the instructions into XML\nrepresentation printed to standard output.\n\n";
+            $message .= "usage: parse.php [--help] [--stats=OUTPUT_FILE [--loc] [--comments] [--labels] [--jumps] [--fwjump] [--backjumps] [--badjumps]]\n\n";
+            $message .= "arguments:\n\n";
+            $message .= "  --help                 show this help message and exit\n";
+            $message .= "  --stats=OUTPUT_FILE    file to write stats into\n";
+            $message .= "  --loc                  write the number of lines of code to stats\n";
+            $message .= "  --comments             write the number of comments to stats\n";
+            $message .= "  --labels               write the number of labels to stats\n";
+            $message .= "  --jumps                write the number of jumps to stats\n";
+            $message .= "  --fwjump               write the number of forward jumps to stats\n";
+            $message .= "  --backjump             write the number of backward jumps to stats\n";
+            $message .= "  --badjump              write the number of invalid jumps to stats\n";
+            exit_err(Code::SUCCESS, $message);
         }
         else if ($argc > 1 && (strpos($argv[0], '--stats') === false || in_array('--help', $argv)))
         {
