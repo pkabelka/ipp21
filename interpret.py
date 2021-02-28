@@ -37,8 +37,8 @@ def exit_err(code, message=''):
     if message == '':
         if code in err_messages:
             message = err_messages[code]
-
-    print(message, file=sys.stderr)
+    else:
+        print(message, file=sys.stderr)
     exit(code.value)
 
 class Instruction():
@@ -437,7 +437,7 @@ class Stack:
 
 
 class InstructionExecutor:
-    def __init__(self, instructions, input_file):
+    def __init__(self, instructions, input_file, xmlroot, stats_path, stats_group):
         self.insts = instructions
         self.frames = Frames()
         self.stack = Stack()
@@ -449,6 +449,9 @@ class InstructionExecutor:
                 self.input_file = open(input_file, 'r')
             except Exception:
                 exit_err(Code.OPEN_ERR)
+        self.xmlroot = xmlroot
+        self.stats_path = stats_path
+        self.stats_group = stats_group
 
     def interpret(self):
         while True:
@@ -467,6 +470,30 @@ class InstructionExecutor:
         if 'BREAK' in self.exec_per_inst: del(self.exec_per_inst['BREAK'])
         if 'DPRINT' in self.exec_per_inst: del(self.exec_per_inst['DPRINT'])
         self.exec_per_inst = dict(reversed(sorted(self.exec_per_inst.items(), key=lambda item: item[1])))
+        self.write_stats()
+        exit_err(Code.SUCCESS)
+
+    def write_stats(self):
+        if self.stats_path:
+            if (len(self.exec_per_inst)) > 0:
+                most_exec = list(self.exec_per_inst.keys())[0]
+                insts = self.xmlroot.findall(f'.//instruction[@opcode="{most_exec}"]')
+                min_order = int(insts[0].attrib['order'])
+                if len(insts) > 1:
+                    for inst in insts:
+                        min_order = min(min_order, int(inst.attrib['order']))
+
+            try:
+                with open(self.stats_path, 'w') as stat_file:
+                    for stat in self.stats_group:
+                        if stat == '--insts':
+                            stat_file.write(f'{self.insts.executed_count}\n')
+                        elif stat == '--hot':
+                            stat_file.write(f'{min_order}\n')
+                        elif stat == '--vars':
+                            stat_file.write(f'{self.frames.get_init_vars()}\n')
+            except Exception:
+                exit_err(Code.WRITE_ERR)
 
     def _MOVE(self, args):
         if args[1]['type'] in ['int', 'string', 'bool', 'nil', 'float']:
@@ -781,7 +808,7 @@ class InstructionExecutor:
                 res_type = 'nil'
         elif type_ == 'float':
             try:
-                res_val = float(input_val)
+                res_val = float.fromhex(input_val)
             except Exception:
                 res_val = 'nil'
                 res_type = 'nil'
@@ -893,6 +920,7 @@ class InstructionExecutor:
     def _EXIT(self, args):
         symb = self.frames.const_var(args[0])
         if symb.type == 'int' and (symb.value >= 0 or symb.value <= 49):
+            self.write_stats()
             exit(symb.value)
         else:
             exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
@@ -1071,7 +1099,7 @@ class XMLParser():
                     self._var_syntax(arg, order, arg_i)
 
                 elif arg.attrib['type'] == 'float':
-                    # if not re.match(r'^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$', arg.text):
+                    # if not re.match(r'^\s*[+-]?(?:0[xX])?[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?(?:[pP][+-]?[0-9]+)?\s*$', arg.text):
                     #     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
                     try:
                         arg.text = float.fromhex(arg.text)
@@ -1180,29 +1208,8 @@ def main():
     xmlparser = XMLParser()
     instructions = xmlparser.parse(source_file)
 
-    inst_ex = InstructionExecutor(instructions, input_file)
+    inst_ex = InstructionExecutor(instructions, input_file, xmlparser.tree.getroot(), stats_path, stats_group)
     inst_ex.interpret()
-
-    if stats_path:
-        if (len(inst_ex.exec_per_inst)) > 0:
-            most_exec = list(inst_ex.exec_per_inst.keys())[0]
-            insts = xmlparser.tree.getroot().findall(f'.//instruction[@opcode="{most_exec}"]')
-            min_order = int(insts[0].attrib['order'])
-            if len(insts) > 1:
-                for inst in insts:
-                    min_order = min(min_order, int(inst.attrib['order']))
-
-        try:
-            with open(stats_path, 'w+') as stat_file:
-                for stat in stats_group:
-                    if stat == '--insts':
-                        stat_file.write(f'{inst_ex.insts.executed_count}\n')
-                    elif stat == '--hot':
-                        stat_file.write(f'{min_order}\n')
-                    elif stat == '--vars':
-                        stat_file.write(f'{inst_ex.frames.get_init_vars()}\n')
-        except Exception:
-            exit_err(Code.WRITE_ERR)
 
 if __name__ == '__main__':
     main()
