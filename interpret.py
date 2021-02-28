@@ -60,6 +60,8 @@ class Instruction():
         'MULS': tuple(),
         'IDIV': ('var', 'symb', 'symb'),
         'IDIVS': tuple(),
+        'DIV': ('var', 'symb', 'symb'),
+        'DIVS': tuple(),
         'LT': ('var', 'symb', 'symb'),
         'LTS': tuple(),
         'GT': ('var', 'symb', 'symb'),
@@ -76,6 +78,10 @@ class Instruction():
         'INT2CHARS': tuple(),
         'STRI2INT': ('var', 'symb', 'symb'),
         'STRI2INTS': tuple(),
+        'INT2FLOAT': ('var', 'symb'),
+        'INT2FLOATS': tuple(),
+        'FLOAT2INT': ('var', 'symb'),
+        'FLOAT2INTS': tuple(),
         'READ': ('var', 'type'),
         'WRITE': tuple(['symb']),
         'CONCAT': ('var', 'symb', 'symb'),
@@ -184,7 +190,7 @@ class Var:
 
     def __sub__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var(self.type, self.value - second.value)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, wrong operand types')
@@ -192,7 +198,7 @@ class Var:
 
     def __mul__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var(self.type, self.value * second.value)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, wrong operand types')
@@ -210,9 +216,21 @@ class Var:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not of same type')
 
+    def __truediv__(self, second):
+        if self.type == second.type:
+            if self.type == 'float':
+                val1 = self.value
+                val2 = second.value
+                if val2 == 0.0:
+                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Division by zero')
+                return Var(self.type, val1 / val2)
+            else:
+                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot divide the values, wrong operand types')
+        exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot divide the values, both not of same type')
+
     def __lt__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var('bool', 'true' if self.value < second.value else 'false')
             elif self.type == 'bool':
                 return Var('bool', 'true' if self.value == 'false' else 'false')
@@ -224,7 +242,7 @@ class Var:
 
     def __gt__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var('bool', str(self.value > second.value).lower())
             elif self.type == 'bool':
                 return Var('bool', 'true' if second.value == 'false' else 'false')
@@ -236,7 +254,7 @@ class Var:
 
     def __eq__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var('bool', str(self.value == second.value).lower())
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value == second.value else 'false')
@@ -249,7 +267,7 @@ class Var:
 
     def __ne__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
+            if self.type in ['int', 'float']:
                 return Var('bool', str(self.value != second.value).lower())
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value != second.value else 'false')
@@ -382,7 +400,7 @@ class Frames():
         return self._tf
 
     def const_var(self, var):
-        if var['type'] in ['int', 'string', 'bool', 'nil']:
+        if var['type'] in ['int', 'string', 'bool', 'nil', 'float']:
             return Var(var['type'], var['value'])
         elif var['type'] == 'var':
             frame, var_name = self.getvar(var['value'])
@@ -451,7 +469,7 @@ class InstructionExecutor:
         self.exec_per_inst = dict(reversed(sorted(self.exec_per_inst.items(), key=lambda item: item[1])))
 
     def _MOVE(self, args):
-        if args[1]['type'] in ['int', 'string', 'bool', 'nil']:
+        if args[1]['type'] in ['int', 'string', 'bool', 'nil', 'float']:
             self.frames.setvar(args[0]['value'], Var(args[1]['type'], args[1]['value']))
         elif args[1]['type'] == 'var':
             frame, var_name = self.frames.getvar(args[1]['value'])
@@ -505,7 +523,7 @@ class InstructionExecutor:
     def _SUB(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.frames.setvar(args[0]['value'], symb1 - symb2)
         elif symb1.type == 'string' or symb2.type == 'string':
             exit_err(Code.STRING_ERR, 'Error: Cannot subtract strings')
@@ -515,7 +533,7 @@ class InstructionExecutor:
     def _SUBS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.stack.pushs(symb1 - symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
@@ -523,7 +541,7 @@ class InstructionExecutor:
     def _MUL(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.frames.setvar(args[0]['value'], symb1 * symb2)
         elif symb1.type == 'string' or symb2.type == 'string':
             exit_err(Code.STRING_ERR, 'Error: Cannot multiply strings')
@@ -533,7 +551,7 @@ class InstructionExecutor:
     def _MULS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.stack.pushs(symb1 * symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
@@ -554,12 +572,30 @@ class InstructionExecutor:
         if symb1.type == 'int' and symb2.type == 'int':
             self.stack.pushs(symb1 // symb2)
         else:
-            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not type int')
+
+    def _DIV(self, args):
+        symb1 = self.frames.const_var(args[1])
+        symb2 = self.frames.const_var(args[2])
+        if symb1.type == 'float' and symb2.type == 'float':
+            self.frames.setvar(args[0]['value'], symb1 / symb2)
+        elif symb1.type == 'string' or symb2.type == 'string':
+            exit_err(Code.STRING_ERR, 'Error: Cannot divide strings')
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot divide the values, both not type float')
+
+    def _DIVS(self, args):
+        symb2 = self.stack.pops()
+        symb1 = self.stack.pops()
+        if symb1.type == 'float' and symb2.type == 'float':
+            self.stack.pushs(symb1 / symb2)
+        else:
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot divide the values, both not type float')
 
     def _LT(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+        if symb1.type == symb2.type and symb1.type != 'nil':
             self.frames.setvar(args[0]['value'], symb1 < symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -567,7 +603,7 @@ class InstructionExecutor:
     def _LTS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+        if symb1.type == symb2.type and symb1.type != 'nil':
             self.stack.pushs(symb1 < symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -575,7 +611,7 @@ class InstructionExecutor:
     def _GT(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+        if symb1.type == symb2.type and symb1.type != 'nil':
             self.frames.setvar(args[0]['value'], symb1 > symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -583,7 +619,7 @@ class InstructionExecutor:
     def _GTS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == symb2.type and symb1.type in ['int', 'string', 'bool']:
+        if symb1.type == symb2.type and symb1.type != 'nil':
             self.stack.pushs(symb1 > symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
@@ -690,8 +726,36 @@ class InstructionExecutor:
 
         self.stack.pushs(Var('int', ord(symb1.value[symb2.value])))
 
+    def _INT2FLOAT(self, args):
+        symb = self.frames.const_var(args[1])
+        if symb.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to float')
+
+        self.frames.setvar(args[0]['value'], Var('float', float(symb.value)))
+
+    def _INT2FLOATS(self, args):
+        symb = self.stack.pops()
+        if symb.type != 'int':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to float')
+
+        self.stack.pushs(Var('float', float(symb.value)))
+
+    def _FLOAT2INT(self, args):
+        symb = self.frames.const_var(args[1])
+        if symb.type != 'float':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to int')
+
+        self.frames.setvar(args[0]['value'], Var('int', int(symb.value)))
+
+    def _FLOAT2INTS(self, args):
+        symb = self.stack.pops()
+        if symb.type != 'float':
+            exit_err(Code.BAD_OPERAND_TYPE, f'Error: Cannot convert type "{symb.type}" to int')
+
+        self.stack.pushs(Var('int', int(symb.value)))
+
     def _READ(self, args):
-        if args[1]['value'] not in ['int', 'string', 'bool']:
+        if args[1]['value'] not in ['int', 'string', 'bool', 'float']:
             exit_err(Code.BAD_OPERAND_VAL, f'Error: Wrong operand value')
 
         type_ = args[1]['value']
@@ -712,6 +776,12 @@ class InstructionExecutor:
         elif type_ == 'int':
             try:
                 res_val = int(input_val)
+            except Exception:
+                res_val = 'nil'
+                res_type = 'nil'
+        elif type_ == 'float':
+            try:
+                res_val = float(input_val)
             except Exception:
                 res_val = 'nil'
                 res_type = 'nil'
@@ -973,13 +1043,12 @@ class XMLParser():
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Unexpected symb argument type "{}"'.format(order, arg.attrib['type']))
 
                 if arg.attrib['type'] == 'int':
-                    if arg.text is None or not re.match(r'^[+-]?[0-9]+$', arg.text):
-                        exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" has wrong value')
-
+                    # if arg.text is None or not re.match(r'^[+-]?[0-9]+$', arg.text):
+                    #     exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" has wrong value')
                     try:
                         arg.text = int(arg.text)
                     except ValueError:
-                        exit_err(Code.BAD_STRUCT, 'Error: Wrong int type value')
+                        exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" has wrong value')
 
                 elif arg.attrib['type'] == 'string':
                     if arg.text is not None:
@@ -1002,12 +1071,12 @@ class XMLParser():
                     self._var_syntax(arg, order, arg_i)
 
                 elif arg.attrib['type'] == 'float':
-                    if not re.match(r'^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$', arg.text):
-                        exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
+                    # if not re.match(r'^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$', arg.text):
+                    #     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
                     try:
                         arg.text = float.fromhex(arg.text)
                     except ValueError:
-                        exit_err(Code.BAD_STRUCT, 'Error: Wrong float type value')
+                        exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "float" has wrong value')
 
 
             elif pos_type == 'var':
@@ -1018,7 +1087,7 @@ class XMLParser():
                 if arg.attrib['type'] != 'type':
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Unexpected type argument type "{}"'.format(order, arg.attrib['type']))
 
-                if arg.text is None or arg.text not in ['int', 'string', 'bool']:
+                if arg.text is None or arg.text not in ['int', 'string', 'bool', 'float']:
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
 
 
