@@ -167,13 +167,7 @@ class Var:
     """Class representing a variable, has type and value"""
     def __init__(self, type_, value):
         self.type = type_
-        if self.type == 'int':
-            try:
-                self.value = int(value)
-            except ValueError:
-                exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
-        else:
-            self.value = value
+        self.value = value
 
     def __repr__(self):
         if self.value == None:
@@ -182,13 +176,8 @@ class Var:
 
     def __add__(self, second):
         if self.type == second.type:
-            if self.type == 'int':
-                try:
-                    return Var(self.type, int(self.value) + int(second.value))
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
-            elif self.type == 'string':
-                return Var(self.type, str(self.value) + str(second.value))
+            if self.type in ['int', 'float', 'string']:
+                return Var(self.type, self.value + second.value)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not of same type')
@@ -196,10 +185,7 @@ class Var:
     def __sub__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var(self.type, int(self.value) - int(second.value))
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                return Var(self.type, self.value - second.value)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, both not of same type')
@@ -207,10 +193,7 @@ class Var:
     def __mul__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var(self.type, int(self.value) * int(second.value))
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                return Var(self.type, self.value * second.value)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, both not of same type')
@@ -218,14 +201,11 @@ class Var:
     def __floordiv__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    val1 = int(self.value)
-                    val2 = int(second.value)
-                    if val2 == 0:
-                        exit_err(Code.BAD_OPERAND_VAL, 'Error: Division by zero')
-                    return Var(self.type, val1 // val2)
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                val1 = self.value
+                val2 = second.value
+                if val2 == 0:
+                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Division by zero')
+                return Var(self.type, val1 // val2)
             else:
                 exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, wrong operand types')
         exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not of same type')
@@ -233,10 +213,7 @@ class Var:
     def __lt__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var('bool', 'true' if int(self.value) < int(second.value) else 'false')
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                return Var('bool', 'true' if self.value < second.value else 'false')
             elif self.type == 'bool':
                 return Var('bool', 'true' if self.value == 'false' else 'false')
             elif self.type == 'string':
@@ -248,10 +225,7 @@ class Var:
     def __gt__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var('bool', str(int(self.value) > int(second.value)).lower())
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong int type value')
+                return Var('bool', str(self.value > second.value).lower())
             elif self.type == 'bool':
                 return Var('bool', 'true' if second.value == 'false' else 'false')
             elif self.type == 'string':
@@ -263,10 +237,7 @@ class Var:
     def __eq__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var('bool', str(int(self.value) == int(second.value)).lower())
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Wrong int type value')
+                return Var('bool', str(self.value == second.value).lower())
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value == second.value else 'false')
             else:
@@ -279,10 +250,7 @@ class Var:
     def __ne__(self, second):
         if self.type == second.type:
             if self.type == 'int':
-                try:
-                    return Var('bool', str(int(self.value) != int(second.value)).lower())
-                except ValueError:
-                    exit_err(Code.BAD_OPERAND_VAL, 'Error: Wrong int type value')
+                return Var('bool', str(self.value != second.value).lower())
             elif self.type in ['string', 'bool', 'nil']:
                 return Var('bool', 'true' if self.value != second.value else 'false')
             else:
@@ -509,7 +477,7 @@ class InstructionExecutor:
         self.insts.return_()
 
     def _PUSHS(self, args):
-        if args[0]['type'] in ['int', 'string', 'bool', 'nil']:
+        if args[0]['type'] in ['int', 'string', 'bool', 'nil', 'float']:
             self.stack.pushs(Var(args[0]['type'], args[0]['value']))
         elif args[0]['type'] == 'var':
             frame, var_name = self.frames.getvar(args[0]['value'])
@@ -521,7 +489,7 @@ class InstructionExecutor:
     def _ADD(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.frames.setvar(args[0]['value'], symb1 + symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
@@ -529,7 +497,7 @@ class InstructionExecutor:
     def _ADDS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
-        if symb1.type == 'int' and symb2.type == 'int':
+        if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.stack.pushs(symb1 + symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot add the values, both not type int')
@@ -1001,12 +969,17 @@ class XMLParser():
 
             pos_type = Instruction.opcode_args(opcode)[arg_i-1]
             if pos_type == 'symb':
-                if arg.attrib['type'] not in ['int', 'string', 'bool', 'nil', 'var']:
+                if arg.attrib['type'] not in ['int', 'string', 'bool', 'nil', 'var', 'float']:
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Unexpected symb argument type "{}"'.format(order, arg.attrib['type']))
 
                 if arg.attrib['type'] == 'int':
-                    if arg.text is None:
-                        exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" cannot have an empty value')
+                    if arg.text is None or not re.match(r'^[+-]?[0-9]+$', arg.text):
+                        exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" has wrong value')
+
+                    try:
+                        arg.text = int(arg.text)
+                    except ValueError:
+                        exit_err(Code.BAD_STRUCT, 'Error: Wrong int type value')
 
                 elif arg.attrib['type'] == 'string':
                     if arg.text is not None:
@@ -1028,8 +1001,13 @@ class XMLParser():
                 elif arg.attrib['type'] == 'var':
                     self._var_syntax(arg, order, arg_i)
 
-                elif arg.attrib['type'] == 'float': # ^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$
-                    pass
+                elif arg.attrib['type'] == 'float':
+                    if not re.match(r'^\s*[+-]?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][+-]?\d+\s*$', arg.text):
+                        exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
+                    try:
+                        arg.text = float.fromhex(arg.text)
+                    except ValueError:
+                        exit_err(Code.BAD_STRUCT, 'Error: Wrong float type value')
 
 
             elif pos_type == 'var':
