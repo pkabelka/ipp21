@@ -78,7 +78,8 @@ class Parser
             $message .= "  --fwjump               write the number of forward jumps to stats\n";
             $message .= "  --backjump             write the number of backward jumps to stats\n";
             $message .= "  --badjump              write the number of invalid jumps to stats\n";
-            exit_err(Code::SUCCESS, $message);
+            fprintf(STDOUT, $message);
+            exit(Code::SUCCESS);
         }
         else if ($argc > 1 && (strpos($argv[0], '--stats') === false || in_array('--help', $argv)))
         {
