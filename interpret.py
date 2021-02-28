@@ -819,7 +819,9 @@ class InstructionExecutor:
 
     def _WRITE(self, args):
         symb = self.frames.const_var(args[0])
-        if symb.type == 'nil':
+        if symb.type == 'float':
+            print(symb.value.hex(), end='')
+        elif symb.type == 'nil':
             print('', end='')
         else:
             print(symb.value, end='')
