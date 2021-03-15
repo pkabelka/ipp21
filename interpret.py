@@ -671,7 +671,7 @@ class InstructionExecutor:
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'bool' and symb2.type == 'bool':
-            self.frames.setvar(args[0]['value'], symb1 and symb2)
+            self.frames.setvar(args[0]['value'], symb1 & symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -679,7 +679,7 @@ class InstructionExecutor:
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
         if symb1.type == 'bool' and symb2.type == 'bool':
-            self.stack.pushs(symb1 and symb2)
+            self.stack.pushs(symb1 & symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -687,7 +687,7 @@ class InstructionExecutor:
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'bool' and symb2.type == 'bool':
-            self.frames.setvar(args[0]['value'], symb1 or symb2)
+            self.frames.setvar(args[0]['value'], symb1 | symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -695,7 +695,7 @@ class InstructionExecutor:
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
         if symb1.type == 'bool' and symb2.type == 'bool':
-            self.stack.pushs(symb1 or symb2)
+            self.stack.pushs(symb1 | symb2)
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot compare values')
 
@@ -1060,10 +1060,20 @@ class XMLParser():
             exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Wrong number of arguments, expected {} but {} given'.format(order, len(Instruction.opcode_args(opcode)), len(inst)))
 
         # argument syntax
-        arg_i = 1
+        arg_orders = {}
         for arg in inst:
-            if arg.tag != f'arg{arg_i}':
-                exit_err(Code.BAD_STRUCT, f'Error: expected "arg{arg_i}" tag, not "{arg.tag}"')
+            if 'arg' not in arg.tag:
+                exit_err(Code.BAD_STRUCT, 'Error: Invalid arg tag')
+
+            try:
+                arg_i = int(arg.tag[3:])
+                if arg_i < 1 or arg_i > 3 or arg_i > len(Instruction.opcode_args(opcode)):
+                    exit_err(Code.BAD_STRUCT, 'Error: "arg" tag order must have a positive non-zero integer value')
+            except ValueError:
+                exit_err(Code.BAD_STRUCT, 'Error: "arg" tag order must have a positive non-zero integer value')
+            
+            if arg_i in arg_orders:
+                exit_err(Code.BAD_STRUCT, 'Error: Duplicate "arg" tag value')
 
             if len(arg.attrib) > 1 or 'type' not in arg.attrib:
                 exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": Expected a single argument attribute "type"')
@@ -1129,9 +1139,10 @@ class XMLParser():
                 if arg.text is None or re.match(r'^[a-zA-Z_\-\$\&\%\*\!\?][a-zA-Z0-9_\-\$\&\%\*\!\?]*$', arg.text) is None:
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
 
-            args.append({'type': arg.attrib['type'], 'value': arg.text})
-            arg_i += 1
+            arg_orders[arg_i] = {'type': arg.attrib['type'], 'value': arg.text}
 
+        for i in sorted(arg_orders):
+            args.append(arg_orders[i])
         return args
 
     def _var_syntax(self, arg, order, arg_i):
