@@ -399,11 +399,11 @@ class Frames():
     def get_tf(self):
         return self._tf
 
-    def const_var(self, var):
+    def const_var(self, var, check_init=True):
         if var['type'] in ['int', 'string', 'bool', 'nil', 'float']:
             return Var(var['type'], var['value'])
         elif var['type'] == 'var':
-            frame, var_name = self.getvar(var['value'])
+            frame, var_name = self.getvar(var['value'], check_init=check_init)
             return frame[var_name]
 
     def _check_init_vars(self):
@@ -790,7 +790,10 @@ class InstructionExecutor:
         res_val = ''
         res_type = type_
         try:
-            input_val = self.input_file.readline().rstrip('\n')
+            if self.input_file == sys.stdin:
+                input_val = input().rstrip('\n')
+            else:
+                input_val = self.input_file.readline().rstrip('\n')
         except Exception:
             res_val = 'nil'
             res_type = 'nil'
@@ -868,7 +871,7 @@ class InstructionExecutor:
         self.frames.setvar(args[0]['value'], Var('string', var.value[:symb1.value] + symb2.value[0] + var.value[symb1.value + 1:]))
 
     def _TYPE(self, args):
-        symb = self.frames.const_var(args[1])
+        symb = self.frames.const_var(args[1], check_init=False)
         if symb.type is None:
             self.frames.setvar(args[0]['value'], Var('string', ''))
         else:
@@ -1021,10 +1024,8 @@ class XMLParser():
                 exit_err(Code.BAD_STRUCT, 'Error: "instruction" element is missing "opcode" attribute')
 
 
-            opcode = inst.attrib['opcode']
+            opcode = inst.attrib['opcode'].upper()
             order = inst.attrib['order']
-            if not re.match(r'^[A-Z0-9]+$', opcode):
-                exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": Invalid characters in opcode: "{opcode}"')
 
             try:
                 if int(order) < 1:
@@ -1050,7 +1051,7 @@ class XMLParser():
 
     def _inst_syntax(self, inst):
         args = []
-        opcode = inst.attrib['opcode']
+        opcode = inst.attrib['opcode'].upper()
         order = inst.attrib['order']
         if Instruction.opcode_args(opcode) is None:
             exit_err(Code.BAD_STRUCT, 'Error: Unknown instruction opcode "{}" with order "{}"'.format(inst.attrib['opcode'], order))
