@@ -233,7 +233,7 @@ class Var:
             if self.type in ['int', 'float']:
                 return Var('bool', 'true' if self.value < second.value else 'false')
             elif self.type == 'bool':
-                return Var('bool', 'true' if self.value == 'false' else 'false')
+                return Var('bool', 'true' if self.value == 'false' and second.value == 'true' else 'false')
             elif self.type == 'string':
                 return Var('bool', 'true' if self.value < second.value else 'false')
             else:
@@ -245,7 +245,7 @@ class Var:
             if self.type in ['int', 'float']:
                 return Var('bool', str(self.value > second.value).lower())
             elif self.type == 'bool':
-                return Var('bool', 'true' if second.value == 'false' else 'false')
+                return Var('bool', 'true' if self.value == 'true' and second.value == 'false' else 'false')
             elif self.type == 'string':
                 return Var('bool', 'true' if self.value > second.value else 'false')
             else:
