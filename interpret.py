@@ -92,9 +92,9 @@ class Instruction():
         'LABEL': tuple(['label']),
         'JUMP': tuple(['label']),
         'JUMPIFEQ': ('label', 'symb', 'symb'),
-        'JUMPIFEQS': tuple(),
+        'JUMPIFEQS': tuple(['label']),
         'JUMPIFNEQ': ('label', 'symb', 'symb'),
-        'JUMPIFNEQS': tuple(),
+        'JUMPIFNEQS': tuple(['label']),
         'CLEARS': tuple(),
         'EXIT': tuple(['symb']),
         'DPRINT': tuple(['symb']),
@@ -720,7 +720,7 @@ class InstructionExecutor:
         try:
             self.frames.setvar(args[0]['value'], Var('string', chr(symb.value)))
         except ValueError:
-            exit_err(Code.BAD_OPERAND_VAL, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
+            exit_err(Code.STRING_ERR, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
 
     def _INT2CHARS(self, args):
         symb = self.stack.pops()
@@ -729,7 +729,7 @@ class InstructionExecutor:
         try:
             self.stack.pushs(Var('string', chr(symb.value)))
         except ValueError:
-            exit_err(Code.BAD_OPERAND_VAL, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
+            exit_err(Code.STRING_ERR, f'Error: Cannot convert int to char, "{symb.value}" is not valid Unicode value')
 
     def _STRI2INT(self, args):
         symb1 = self.frames.const_var(args[1])
