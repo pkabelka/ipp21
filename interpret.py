@@ -148,8 +148,11 @@ class Instructions:
             return self._instructions[self._pc - 1]
         return None
 
+    def label_exists(self, label):
+        return label in self._labels
+
     def jump(self, label):
-        if label not in self._labels:
+        if not self.label_exists(label):
             exit_err(Code.UNDEF_REDEF, f'Error: Label "{label}" is not defined')
         self._pc = self._labels[label]
 
@@ -884,6 +887,8 @@ class InstructionExecutor:
     def _JUMPIFEQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
+        if not self.insts.label_exists(args[0]['value']):
+            exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" does not exist'.format(args[0]['value']))
         if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 == symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
@@ -893,6 +898,8 @@ class InstructionExecutor:
     def _JUMPIFEQS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
+        if not self.insts.label_exists(args[0]['value']):
+            exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" does not exist'.format(args[0]['value']))
         if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 == symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
@@ -902,6 +909,8 @@ class InstructionExecutor:
     def _JUMPIFNEQ(self, args):
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
+        if not self.insts.label_exists(args[0]['value']):
+            exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" does not exist'.format(args[0]['value']))
         if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 != symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
@@ -911,6 +920,8 @@ class InstructionExecutor:
     def _JUMPIFNEQS(self, args):
         symb2 = self.stack.pops()
         symb1 = self.stack.pops()
+        if not self.insts.label_exists(args[0]['value']):
+            exit_err(Code.UNDEF_REDEF, 'Error: Label "{}" does not exist'.format(args[0]['value']))
         if symb1.type == symb2.type or symb1.type == 'nil' or symb2.type == 'nil':
             if (symb1 != symb2).value == 'true':
                 self.insts.jump(args[0]['value'])
