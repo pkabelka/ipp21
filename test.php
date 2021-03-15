@@ -64,8 +64,8 @@ else if ($argc > 1 && in_array('--help', $argv))
 $args = array(
     'directory=' => '.',
     'recursive' => false,
-    'parse-script=' => 'parse.php',
-    'int-script=' => 'interpret.py',
+    'parse-script=' => '',
+    'int-script=' => '',
     'parse-only' => false,
     'int-only' => false,
     'jexamxml=' => '/pub/courses/ipp/jexamxml/jexamxml.jar',
@@ -113,18 +113,49 @@ foreach ($argv as $arg) {
     }
 }
 
-print_r($args);
+$directory = rtrim($args['directory='], '/');
+$parse_only = $args['parse-only'];
+$int_only = $args['int-only'];
+$int_script = $args['int-script='];
+$parse_script = $args['parse-script='];
+$jexamxml = $args['jexamxml='];
+$jexamcfg = $args['jexamcfg='];
 
-if (!is_readable($args['directory=']) || !is_readable($args['parse-script=']) || !is_readable($args['int-script='])/* || !is_readable($args['jexamxml=']) || !is_readable($args['jexamcfg='])*/)
+if ($parse_only && ($int_only || $int_script !== ''))
+{
+    exit_err(Code::BAD_PARAM, "Error: Cannot combine --parse-only with --int-only and --int-script\nRun only with --help to show help\n");
+}
+if ($int_only && ($parse_only || $parse_script !== ''))
+{
+    exit_err(Code::BAD_PARAM, "Error: Cannot combine --int-only with --parse-only and --parse-script\nRun only with --help to show help\n");
+}
+
+if (!is_readable($directory) || $parse_script !== '' && !is_readable($parse_script) || $int_script !== '' && !is_readable($int_script)/* || !is_readable($args['jexamxml=']) || !is_readable($args['jexamcfg='])*/)
 {
     exit_err(Code::INVALID_PATH, "Error: Path to one of the required files is not readable\n");
 }
 
+if ($parse_script === '')
+{
+    $parse_script = 'parse.php';
+    if (!is_readable($parse_script) && !$int_only)
+    {
+        exit_err(Code::INVALID_PATH, "Error: parse.php is not readable\n");
+    }
+}
+if ($int_script === '')
+{
+    $int_script = 'interpret.py';
+    if (!is_readable($int_script) && !$parse_only)
+    {
+        exit_err(Code::INVALID_PATH, "Error: interpret.py is not readable\n");
+    }
+}
 
 $test_names = array();
 if ($args['recursive'])
 {
-    foreach (new RegexIterator(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($args['directory='])), '/^.+\.src$/', RecursiveRegexIterator::GET_MATCH) as $x)
+    foreach (new RegexIterator(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)), '/^.+\.src$/', RecursiveRegexIterator::GET_MATCH) as $x)
     {
         foreach ($x as $path)
         {
@@ -137,21 +168,22 @@ if ($args['recursive'])
 }
 else
 {
-    $dir = preg_grep('/^.+\.src$/', scandir($args['directory=']));
+    $dir = preg_grep('/^.+\.src$/', scandir($directory));
     foreach ($dir as $fname)
     {
         if (preg_match('/^(.+)\.src$/', $fname, $m))
         {
-            $test_names[] = $m[1];
+            $test_names[] = $directory . '/' . $m[1];
         }
     }
 }
 
-print_r($test_names);
-
 // $parser_output = tempnam('/tmp', 'ipp');
-$parser_output = tempnam($args['directory='], 'ipp');
-$interpreter_output = tempnam($args['directory='], 'ipp');
+$parser_output = tempnam($directory, 'ipp');
+$interpreter_output = tempnam($directory, 'ipp');
+$diff_output = tempnam($directory, 'ipp');
+
+$test_res = array_fill_keys($test_names, array());
 
 foreach ($test_names as $test)
 {
@@ -173,17 +205,140 @@ foreach ($test_names as $test)
         $rc_ref = intval(file_get_contents($test.'.rc'));
     }
 
-    unset($output);
-    // exec('php.exe ' . $args['parse-script='] . ' < ' . $test . '.src > ' . $parser_output, $output, $rc);
-    exec('php.exe ' . $args['parse-script='] . ' < ' . $test . '.src', $output, $parser_rc);
-    file_put_contents($parser_output, implode(PHP_EOL, $output));
+    $test_res[$test]['rc_ref'] = $rc_ref;
+    $test_res[$test]['diff_rc'] = 0;
 
-    if ($parser_rc == 0)
+    if (!$int_only)
     {
-        exec('py ' . $args['int-script='] . ' < ' . $test . '.src', $output, $interpreter_rc);
-        file_put_contents($interpreter_output, implode(PHP_EOL, $output));
+        unset($output);
+        exec("php.exe $parse_script < $test.src > $parser_output", $output, $parser_rc);
+        // exec("php.exe $parse_script < $test.src", $output, $parser_rc);
+        // file_put_contents($parser_output, implode(PHP_EOL, $output));
+        $test_res[$test]['parser_rc'] = $parser_rc;
+
+        if (!$parse_only && $parser_rc === 0)
+        {
+            unset($output);
+            exec("python3.8 $int_script --source=$parser_output --input=$test.in > $interpreter_output", $output, $int_rc);
+            // exec("python3.8 $int_script --source=$parser_output --input=$test.in", $output, $int_rc);
+            // file_put_contents($interpreter_output, implode(PHP_EOL, $output));
+            $test_res[$test]['int_rc'] = $int_rc;
+        }
+    }
+    else
+    {
+        unset($output);
+        exec("python3.8 $int_script --source=$test.src --input=$test.in > $interpreter_output", $output, $int_rc);
+        // exec("python3.8 $int_script --source=$test.src --input=$test.in", $output, $int_rc);
+        // file_put_contents($interpreter_output, implode(PHP_EOL, $output));
+        $test_res[$test]['int_rc'] = $int_rc;
+    }
+
+    if ($parse_only && $parser_rc === 0)
+    {
+        unset($output);
+        // exec("diff $test.out $parser_output > $diff_output", $output, $diff_rc);
+        exec("java -jar $jexamxml $parser_output $test.out $diff_output $jexamcfg", $output, $diff_rc);
+        $test_res[$test]['diff_output'] = file_get_contents($diff_output);
+        $test_res[$test]['diff_rc'] = $diff_rc;
+        // print_r($output);
+    }
+    else if (!$parse_only && $int_rc >= 0 && $int_rc <= 49)
+    {
+        unset($output);
+        exec("diff $test.out $interpreter_output > $diff_output", $output, $diff_rc);
+        // exec("diff $test.out $interpreter_output", $output, $diff_rc);
+        // $diff_output = implode(PHP_EOL, $output);
+        $test_res[$test]['diff_output'] = file_get_contents($diff_output);
+        $test_res[$test]['diff_rc'] = $diff_rc;
     }
 }
 
+// print_r($test_res);
+
 unlink($parser_output);
 unlink($interpreter_output);
+unlink($diff_output);
+
+$html = "<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"UTF-8\">
+    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>IPP test.php results</title>
+    <style>
+        html, body {
+            font-family: sans-serif;
+            background-color: #d4d4d4;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 5px;
+            text-align: center;
+        }
+        .passed {
+            background-color: rgb(147, 235, 147);
+        }
+        table tr.passed:nth-child(even) {
+            background-color: rgb(97, 228, 97);
+        }
+        .failed {
+            background-color: rgb(208, 136, 136);
+        }
+        table tr.failed:nth-child(even) {
+            background-color: rgb(226, 108, 108);
+        }
+    </style>
+</head>
+<body>
+    <h1>IPP test.php results</h1>\n";
+
+$rows = '';
+$passed_count = 0;
+$failed_count = 0;
+foreach ($test_res as $test_path => $res_arr)
+{
+    $passed = false;
+    if ($parse_only && $res_arr['parser_rc'] === $res_arr['rc_ref'] && $res_arr['diff_rc'] === 0)
+    {
+        $passed = true;
+    }
+    else if (/*$int_only && */$res_arr['int_rc'] === $res_arr['rc_ref'] && $res_arr['diff_rc'] === 0)
+    {
+        $passed = true;
+    }
+
+    if ($passed === true)
+    {
+        $passed = 'passed';
+        $passed_count++;
+    }
+    else
+    {
+        $passed = 'failed';
+        $failed_count++;
+    }
+    $rows .= "        <tr class=\"$passed\"><td>$test_path</td><td>".$res_arr['parser_rc']."</td><td>".$res_arr['int_rc']."</td><td>".$res_arr['diff_rc']."</td></tr>\n";
+}
+
+
+$html .= "<h2 style=\"color: green;\">PASSED: $passed_count<span></span></h2>
+<h2 style=\"color: red;\">FAILED: $failed_count<span></span></h2>
+<table>
+    <tr><th>Test path</th><th>Parser return code</th><th>Interpreter return code</th><th>Diff return code</th></tr>\n";
+
+$html .= $rows;
+
+$html .= "    </table>
+</body>
+</html>
+";
+
+echo $html;
