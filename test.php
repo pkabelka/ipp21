@@ -130,7 +130,7 @@ if ($int_only && ($parse_only || $parse_script !== ''))
     exit_err(Code::BAD_PARAM, "Error: Cannot combine --int-only with --parse-only and --parse-script\nRun only with --help to show help\n");
 }
 
-if (!is_readable($directory) || $parse_script !== '' && !is_readable($parse_script) || $int_script !== '' && !is_readable($int_script)/* || !is_readable($args['jexamxml=']) || !is_readable($args['jexamcfg='])*/)
+if (!is_readable($directory) || $parse_script !== '' && !is_readable($parse_script) || $int_script !== '' && !is_readable($int_script) || (!$int_only && (!is_readable($jexamxml) || !is_readable($jexamcfg))))
 {
     exit_err(Code::INVALID_PATH, "Error: Path to one of the required files is not readable\n");
 }
@@ -178,7 +178,6 @@ else
     }
 }
 
-// $parser_output = tempnam('/tmp', 'ipp');
 $parser_output = tempnam($directory, 'ipp');
 $interpreter_output = tempnam($directory, 'ipp');
 $diff_output = tempnam($directory, 'ipp');
@@ -207,21 +206,18 @@ foreach ($test_names as $test)
 
     $test_res[$test]['rc_ref'] = $rc_ref;
     $test_res[$test]['diff_rc'] = 0;
+    $test_res[$test]['parser_rc'] = '';
 
     if (!$int_only)
     {
         unset($output);
         exec("php7.4 $parse_script < $test.src > $parser_output", $output, $parser_rc);
-        // exec("php7.4 $parse_script < $test.src", $output, $parser_rc);
-        // file_put_contents($parser_output, implode(PHP_EOL, $output));
         $test_res[$test]['parser_rc'] = $parser_rc;
 
         if (!$parse_only && $parser_rc === 0)
         {
             unset($output);
             exec("python3.8 $int_script --source=$parser_output --input=$test.in > $interpreter_output", $output, $int_rc);
-            // exec("python3.8 $int_script --source=$parser_output --input=$test.in", $output, $int_rc);
-            // file_put_contents($interpreter_output, implode(PHP_EOL, $output));
             $test_res[$test]['int_rc'] = $int_rc;
         }
     }
@@ -229,32 +225,24 @@ foreach ($test_names as $test)
     {
         unset($output);
         exec("python3.8 $int_script --source=$test.src --input=$test.in > $interpreter_output", $output, $int_rc);
-        // exec("python3.8 $int_script --source=$test.src --input=$test.in", $output, $int_rc);
-        // file_put_contents($interpreter_output, implode(PHP_EOL, $output));
         $test_res[$test]['int_rc'] = $int_rc;
     }
 
     if ($parse_only && $parser_rc === 0)
     {
         unset($output);
-        // exec("diff $test.out $parser_output > $diff_output", $output, $diff_rc);
         exec("java -jar $jexamxml $parser_output $test.out $diff_output $jexamcfg", $output, $diff_rc);
         $test_res[$test]['diff_output'] = file_get_contents($diff_output);
         $test_res[$test]['diff_rc'] = $diff_rc;
-        // print_r($output);
     }
     else if (!$parse_only && $int_rc >= 0 && $int_rc <= 49)
     {
         unset($output);
         exec("diff $test.out $interpreter_output > $diff_output", $output, $diff_rc);
-        // exec("diff $test.out $interpreter_output", $output, $diff_rc);
-        // $diff_output = implode(PHP_EOL, $output);
         $test_res[$test]['diff_output'] = file_get_contents($diff_output);
         $test_res[$test]['diff_rc'] = $diff_rc;
     }
 }
-
-// print_r($test_res);
 
 unlink($parser_output);
 unlink($interpreter_output);
@@ -310,7 +298,7 @@ foreach ($test_res as $test_path => $res_arr)
     {
         $passed = true;
     }
-    else if (/*$int_only && */$res_arr['int_rc'] === $res_arr['rc_ref'] && $res_arr['diff_rc'] === 0)
+    else if ($res_arr['int_rc'] === $res_arr['rc_ref'] && $res_arr['diff_rc'] === 0)
     {
         $passed = true;
     }
