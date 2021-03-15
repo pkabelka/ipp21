@@ -555,8 +555,6 @@ class InstructionExecutor:
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.frames.setvar(args[0]['value'], symb1 - symb2)
-        elif symb1.type == 'string' or symb2.type == 'string':
-            exit_err(Code.STRING_ERR, 'Error: Cannot subtract strings')
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot subtract the values, both not type int')
 
@@ -573,8 +571,6 @@ class InstructionExecutor:
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'int' and symb2.type == 'int' or symb1.type == 'float' and symb2.type == 'float':
             self.frames.setvar(args[0]['value'], symb1 * symb2)
-        elif symb1.type == 'string' or symb2.type == 'string':
-            exit_err(Code.STRING_ERR, 'Error: Cannot multiply strings')
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot multiply the values, both not type int')
 
