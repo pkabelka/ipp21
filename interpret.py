@@ -588,8 +588,6 @@ class InstructionExecutor:
         symb2 = self.frames.const_var(args[2])
         if symb1.type == 'int' and symb2.type == 'int':
             self.frames.setvar(args[0]['value'], symb1 // symb2)
-        elif symb1.type == 'string' or symb2.type == 'string':
-            exit_err(Code.STRING_ERR, 'Error: Cannot floor divide strings')
         else:
             exit_err(Code.BAD_OPERAND_TYPE, 'Error: Cannot floor divide the values, both not type int')
 
@@ -924,11 +922,14 @@ class InstructionExecutor:
 
     def _EXIT(self, args):
         symb = self.frames.const_var(args[0])
-        if symb.type == 'int' and (symb.value >= 0 or symb.value <= 49):
-            self.write_stats()
-            exit(symb.value)
+        if symb.type == 'int':
+            if symb.value >= 0 and symb.value <= 49:
+                self.write_stats()
+                exit(symb.value)
+            else:
+                exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
         else:
-            exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
+            exit_err(Code.BAD_OPERAND_TYPE, 'Error: Wrong EXIT operand type')
 
     def _DPRINT(self, args):
         self.insts.dec_executed()
