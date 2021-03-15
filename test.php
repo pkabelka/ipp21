@@ -211,8 +211,8 @@ foreach ($test_names as $test)
     if (!$int_only)
     {
         unset($output);
-        exec("php.exe $parse_script < $test.src > $parser_output", $output, $parser_rc);
-        // exec("php.exe $parse_script < $test.src", $output, $parser_rc);
+        exec("php7.4 $parse_script < $test.src > $parser_output", $output, $parser_rc);
+        // exec("php7.4 $parse_script < $test.src", $output, $parser_rc);
         // file_put_contents($parser_output, implode(PHP_EOL, $output));
         $test_res[$test]['parser_rc'] = $parser_rc;
 
