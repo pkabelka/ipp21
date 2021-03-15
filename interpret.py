@@ -859,7 +859,7 @@ class InstructionExecutor:
         symb1 = self.frames.const_var(args[1])
         symb2 = self.frames.const_var(args[2])
 
-        if var.type != symb1.type != 'int' or symb2.type != 'string':
+        if var.type != 'int' or symb1.type != 'int' or symb2.type != 'string':
             exit_err(Code.BAD_OPERAND_TYPE, f'Error: Wrong operand types')
 
         if symb1.value < 0 or symb1.value >= len(symb2.value):
