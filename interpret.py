@@ -12,6 +12,7 @@ from enum import Enum
 import xml.etree.ElementTree as ET
 
 class Code(Enum):
+    """Contains all exit codes"""
     SUCCESS = 0
     BAD_PARAM = 10
     OPEN_ERR = 11
@@ -27,6 +28,11 @@ class Code(Enum):
     STRING_ERR = 58
 
 def exit_err(code, message=''):
+    """Exits the program with the specified exit code and optional message
+    
+    Parameters:
+        code: Exit code
+    """
     err_messages = {
         Code.BAD_PARAM: 'Error: Wrong combination of parameters\nRun only with --help to show help',
         Code.OPEN_ERR: 'Error: Cannot open file',
@@ -39,9 +45,10 @@ def exit_err(code, message=''):
             message = err_messages[code]
     else:
         print(message, file=sys.stderr)
-    exit(code.value)
+    sys.exit(code.value)
 
 class Instruction():
+    """Represents the instruction with opcode and arguments"""
     _INST_MAP = {
         'MOVE': ('var', 'symb'),
         'CREATEFRAME': tuple(),
@@ -103,12 +110,22 @@ class Instruction():
 
     @classmethod
     def opcode_exists(cls, opcode):
+        """Checks if the specified opcode exists in the instruction map
+
+        Parameters:
+            opcode: Opcode to check
+        """
         if opcode in cls._INST_MAP:
             return True
         return False
 
     @classmethod
     def opcode_args(cls, opcode):
+        """Returns the arguments that the instruction accepts
+
+        Parameters:
+            opcode: Instruction opcode
+        """
         if not cls.opcode_exists(opcode):
             return None
         return cls._INST_MAP[opcode]
@@ -119,6 +136,7 @@ class Instruction():
 
 
 class Instructions:
+    """Contains the instruction list, program counter, call stack and labels"""
     def __init__(self):
         self._instructions = []
         self._pc = 0
@@ -142,6 +160,7 @@ class Instructions:
             self._labels[inst.args[0]['value']] = len(self._instructions)
 
     def next(self):
+        """Loads the next instruction by incrementing program counter"""
         if self._pc < len(self._instructions):
             self._pc += 1
             self.executed_count += 1
@@ -149,31 +168,53 @@ class Instructions:
         return None
 
     def label_exists(self, label):
+        """Checks if the specified label exists
+
+        Parameters:
+            label: Label to check
+        """
         return label in self._labels
 
     def jump(self, label):
+        """Jumps to specified label if it exists
+
+        Parameters:
+            label: Label to jump to
+        """
         if not self.label_exists(label):
             exit_err(Code.UNDEF_REDEF, f'Error: Label "{label}" is not defined')
         self._pc = self._labels[label]
 
     def get_pc(self):
+        """Returns the value of program counter"""
         return self._pc
 
-    def call(self):
+    def call(self, label):
+        """Saves the program counter and jumps to the specified label
+
+        Parameters:
+            label: Label to jump to
+        """
         self._calls.append(self.get_pc())
+        self.jump(label)
 
     def return_(self):
+        """Returns from the call"""
         if len(self._calls) == 0:
             exit_err(Code.MISSING_VAL, f'Error: Cannot "RETURN", no address on the call stack')
         self._pc = self._calls.pop()
 
     def dec_executed(self):
+        """Decreases the number of executed instructions statistic"""
         self.executed_count -= 1
 
 
 
 class Var:
-    """Class representing a variable, has type and value"""
+    """Class representing a variable, has type and value
+    
+    Implements all necessary magic methods for operators used with the variables
+    """
     def __init__(self, type_, value):
         self.type = type_
         self.value = value
@@ -305,7 +346,7 @@ class Var:
 
 
 class Frames():
-    """Contains methods for controlling frame operations"""
+    """Contains frames and methods for controlling frame operations"""
     def __init__(self):
         self._lf_stack = []
         self._gf = {}
@@ -314,10 +355,12 @@ class Frames():
         self._init_vars = 0
 
     def createframe(self):
+        """Creates a new Temporary Frame"""
         self._tf = {}
         self._tf_created = True
 
     def pushframe(self):
+        """Pushes the existing Local Frame to the stack and moves the Temporary Frame to a new Local Frame"""
         if not self._tf_created:
             exit_err(Code.UNDEF_FRAME, 'Error: TF (Temporary Frame) does not exist, use "CREATEFRAME" first')
 
@@ -326,6 +369,7 @@ class Frames():
         self._tf_created = False
 
     def popframe(self):
+        """Moves an existing Local Frame to the Temporary Frame and pops a new Local Frame from the stack"""
         if len(self._lf_stack) == 0:
             exit_err(Code.UNDEF_FRAME, 'Error: Cannot "POPFRAME", no frames on the frame stack')
 
@@ -363,6 +407,12 @@ class Frames():
         frame[var_name] = Var(None, None)
 
     def getvar(self, id, check_init=True):
+        """Finds and returns a Var instance specified by the identifier
+
+        Parameters:
+            id: Full variable identifier with the frame specification
+            check_init: Whether or not to check if the variable is initialized
+        """
         frame_name, var_name = id.split('@', 1)
         if frame_name == 'LF':
             if len(self._lf_stack) == 0:
@@ -386,23 +436,39 @@ class Frames():
         return frame, var_name
 
     def setvar(self, id, var: Var):
+        """Finds and returns a Var instance specified by the identifier
+
+        Parameters:
+            id: Full variable identifier with the frame specification
+            var: Variable represented with a Var instance
+        """
         frame, var_name = self.getvar(id, check_init=False)
         frame[var_name] = var
 
         self._check_init_vars()
 
     def get_gf(self):
+        """Returns the Global Frame"""
         return self._gf
 
     def get_lf(self):
+        """Returns the Local Frame"""
         if len(self._lf_stack) > 0:
             return self._lf_stack[-1]
         return {}
 
     def get_tf(self):
+        """Returns the Temporary Frame"""
         return self._tf
 
     def const_var(self, var, check_init=True):
+        """Finds and returns a variable Var instance specified by the identifier
+        in var['value'] or Var instace of the constant
+
+        Parameters:
+            var: Dict with data type and value
+            check_init: Whether or not to check if the variable is initialized
+        """
         if var['type'] in ['int', 'string', 'bool', 'nil', 'float']:
             return Var(var['type'], var['value'])
         elif var['type'] == 'var':
@@ -410,6 +476,7 @@ class Frames():
             return frame[var_name]
 
     def _check_init_vars(self):
+        """Counts the number of initialized variables"""
         count = sum(var.value is not None for var in self.get_tf().values()) + \
                 sum(var.value is not None for var in self.get_lf().values()) + \
                 sum(var.value is not None for var in self.get_gf().values())
@@ -420,26 +487,36 @@ class Frames():
         return self._init_vars
 
 class Stack:
+    """Data stack"""
     def __init__(self):
         self._stack = []
 
     def pushs(self, var: Var):
+        """Pushes the variable to the data stack
+
+        Parameters:
+            var: Variable to push to the data stack
+        """
         self._stack.append(var)
 
     def pops(self):
+        """Pops the variable from the data stack and returns it"""
         if len(self._stack) == 0:
             exit_err(Code.MISSING_VAL, 'Error: Cannot "POPS", no value on the data stack')
         return self._stack.pop()
 
     def clears(self):
+        """Clears the data stack"""
         self._stack = []
 
     def get_stack(self):
+        """Returns the data stack"""
         return self._stack
 
 
 
 class InstructionExecutor:
+    """Contains methods which execute the instruction operations"""
     def __init__(self, instructions, input_file, xmlroot, stats_path, stats_group):
         self.insts = instructions
         self.frames = Frames()
@@ -457,18 +534,20 @@ class InstructionExecutor:
         self.stats_group = stats_group
 
     def interpret(self):
+        """Starts the instruction interpretation"""
         while True:
             inst = self.insts.next()
             if inst is None:
                 break
 
             if Instruction.opcode_exists(inst.opcode):
-                eval(f'self._{inst.opcode}(inst.args)')
+                eval(f'self._{inst.opcode}(inst.args)') # instruction is executed by evaluating this string and calling the method
                 if inst.opcode in self.exec_per_inst:
                     self.exec_per_inst[inst.opcode] += 1
                 else:
                     self.exec_per_inst[inst.opcode] = 1
 
+        # do not count these instructions in number of executions
         if 'LABEL' in self.exec_per_inst: del(self.exec_per_inst['LABEL'])
         if 'BREAK' in self.exec_per_inst: del(self.exec_per_inst['BREAK'])
         if 'DPRINT' in self.exec_per_inst: del(self.exec_per_inst['DPRINT'])
@@ -477,6 +556,7 @@ class InstructionExecutor:
         exit_err(Code.SUCCESS)
 
     def write_stats(self):
+        """Writes the statistics into the statistics file"""
         if self.stats_path:
             if (len(self.exec_per_inst)) > 0:
                 most_exec = list(self.exec_per_inst.keys())[0]
@@ -518,8 +598,7 @@ class InstructionExecutor:
         self.frames.defvar(args[0]['value'])
 
     def _CALL(self, args):
-        self.insts.call()
-        self.insts.jump(args[0]['value'])
+        self.insts.call(args[0]['value'])
 
     def _RETURN(self, args):
         self.insts.return_()
@@ -932,7 +1011,7 @@ class InstructionExecutor:
         if symb.type == 'int':
             if symb.value >= 0 and symb.value <= 49:
                 self.write_stats()
-                exit(symb.value)
+                sys.exit(symb.value)
             else:
                 exit_err(Code.BAD_OPERAND_VAL, f'Error: Exit code "{symb.value}" not in range 0-49')
         else:
@@ -1092,8 +1171,6 @@ class XMLParser():
                     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": Unexpected symb argument type "{}"'.format(order, arg.attrib['type']))
 
                 if arg.attrib['type'] == 'int':
-                    # if arg.text is None or not re.match(r'^[+-]?[0-9]+$', arg.text):
-                    #     exit_err(Code.BAD_STRUCT, f'Error: Order "{order}": arg{arg_i} with type "int" has wrong value')
                     try:
                         arg.text = int(arg.text)
                     except ValueError:
@@ -1104,7 +1181,7 @@ class XMLParser():
                         if re.match(r'^(?:[^\s\#\\]|\\[0-9]{3})*$', arg.text) is None:
                             exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
 
-                        arg.text = re.sub(r'\\([0-9]{3})', self._escape_ascii, arg.text) # replace escape sequences with their characters
+                        arg.text = re.sub(r'\\([0-9]{3})', self._escape_ascii, arg.text) # replaces escape sequences with their characters
                     else:
                         arg.text = ''
 
@@ -1120,8 +1197,6 @@ class XMLParser():
                     self._var_syntax(arg, order, arg_i)
 
                 elif arg.attrib['type'] == 'float':
-                    # if not re.match(r'^\s*[+-]?(?:0[xX])?[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?(?:[pP][+-]?[0-9]+)?\s*$', arg.text):
-                    #     exit_err(Code.BAD_STRUCT, 'Error: Order "{}": "arg{}" with type "{}" has incorrect value'.format(order, arg_i, arg.attrib['type']))
                     try:
                         arg.text = float.fromhex(arg.text)
                     except ValueError:
@@ -1192,7 +1267,7 @@ def parse_args():
         print('  --hot                   write the smallest order of the most executed instruction into stats')
         print('  --vars                  write the maximum number of initialized variables across all frames into stats\n')
         print('Statistic arguments can only be used after --stats argument is specified')
-        exit(0)
+        sys.exit(0)
 
     elif len(args) > 0 and '--help' not in args and (any(source_arg) or any(input_arg)):
         if any(source_arg):
